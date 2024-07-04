@@ -695,8 +695,8 @@ namespace Dotnetarium.Config
             AuditMode                          = configData.AuditMode                          ?? false;
             MinimumPasswordValidatorProperties = configData.MinimumPasswordValidatorProperties ?? 0;
             PasswordValidatorRequiredLength    = configData.PasswordValidatorRequiredLength    ?? 0;
-            MaxInterproceduralMethodCallChain  = configData.MaxInterproceduralMethodCallChain ?? 3;
-            MaxInterproceduralLambdaOrLocalFunctionCallChain = configData.MaxInterproceduralLambdaOrLocalFunctionCallChain ?? 3;
+            MaxInterproceduralMethodCallChain  = configData.MaxInterproceduralMethodCallChain ?? 5;
+            MaxInterproceduralLambdaOrLocalFunctionCallChain = configData.MaxInterproceduralLambdaOrLocalFunctionCallChain ?? 5;
             TaintFlowVisualizationEnabled = configData.TaintFlowVisualizationEnabled ?? false;
 
             if (configData.PasswordValidatorRequiredProperties != null)
