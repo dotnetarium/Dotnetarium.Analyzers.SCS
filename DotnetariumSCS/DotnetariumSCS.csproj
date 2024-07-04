@@ -88,6 +88,8 @@
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(OutputPath)\DotnetariumSCS.dll" PackagePath="analyzers/dotnet" />
       <TfmSpecificPackageFile Include="$(OutputPath)\YamlDotNet.dll" PackagePath="analyzers/dotnet" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\DotnetariumSCS.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\YamlDotNet.dll" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
   </Target>
 </Project>
