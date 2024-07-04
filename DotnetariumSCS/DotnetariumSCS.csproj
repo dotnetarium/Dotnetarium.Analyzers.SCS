@@ -12,7 +12,7 @@
 
   <PropertyGroup>
     <PackageId>Dotnetarium.Analyzers.SCS</PackageId>
-    <PackageVersion>1.0.2</PackageVersion>
+    <PackageVersion>1.0.3</PackageVersion>
     <Authors>Dmitry Balikhin</Authors>
     <PackageProjectUrl>https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
@@ -88,6 +88,8 @@
     <ItemGroup>
       <TfmSpecificPackageFile Include="$(OutputPath)\DotnetariumSCS.dll" PackagePath="analyzers/dotnet" />
       <TfmSpecificPackageFile Include="$(OutputPath)\YamlDotNet.dll" PackagePath="analyzers/dotnet" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\DotnetariumSCS.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\YamlDotNet.dll" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
   </Target>
 </Project>
