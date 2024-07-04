@@ -12,14 +12,14 @@
 
   <PropertyGroup>
     <PackageId>Dotnetarium.Analyzers.SCS</PackageId>
-    <PackageVersion>1.0.1</PackageVersion>
+    <PackageVersion>1.0.2</PackageVersion>
     <Authors>Dmitry Balikhin</Authors>
-    <PackageProjectUrl>https://github.com/dotnetarium/DotnetariumSCS</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <RepositoryUrl>https://github.com/dotnetarium/DotnetariumSCS</RepositoryUrl>
+    <RepositoryUrl>https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS</RepositoryUrl>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Description>Security static code analyzer for .NET based on Security Code Scan</Description>
-    <PackageReleaseNotes>Check details here: https://github.com/dotnetarium/DotnetariumSCS/releases</PackageReleaseNotes>
+    <PackageReleaseNotes>Check details here: https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS/releases</PackageReleaseNotes>
     <Copyright>© Dotnetarium</Copyright>
     <PackageTags>DotnetariumSCS Dotnetarium SCS SecurityCodeScan Security.Code.Scan Security Code Scan StaticAnalysis Vulnerability Analyzer .NET Roslyn OWASP Injection XSS CSRF XXE SQLi</PackageTags>
     <DevelopmentDependency>true</DevelopmentDependency>
@@ -64,11 +64,6 @@
     <PackageReference Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="3.11.0" />
     <PackageReference Include="YamlDotNet" Version="15.3.0" />
     <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="Empty.Designer.cs" DesignTime="True" AutoGen="True" DependentUpon="Empty.resx" />
-    <EmbeddedResource Update="Empty.resx" Generator="ResXFileCodeGenerator" LastGenOutput="Empty.Designer.cs" />
   </ItemGroup>
 
   <ItemGroup>
