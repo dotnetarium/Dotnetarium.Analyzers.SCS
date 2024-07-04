@@ -27,7 +27,7 @@ namespace DotnetariumSCS.Test
 
         protected override IEnumerable<MetadataReference> GetAdditionalReferences() => References;
 
-        private const int DefaultPasswordValidatorRequiredLenght = 8;
+        private const int DefaultPasswordValidatorRequiredLenght = 12;
 
         /// <summary>
         /// Test case where the RequiredLength field has an accepted value.

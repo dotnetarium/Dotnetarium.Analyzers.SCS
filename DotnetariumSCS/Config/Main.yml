@@ -6,18 +6,18 @@ ReportAnalysisCompletion: false
 # Set to 'true' to see more warnings
 AuditMode: false
 
-MaxInterproceduralMethodCallChain: 3
+MaxInterproceduralMethodCallChain: 5
 
-MaxInterproceduralLambdaOrLocalFunctionCallChain: 3
+MaxInterproceduralLambdaOrLocalFunctionCallChain: 5
 
-# Generate a list of additional locations for the taint analyzer (experimental feature: disabled by default)
+# Generate a list of additional locations for the taint analyzer (experimental feature)
 TaintFlowVisualizationEnabled: false
 
 # Case insensitive pattern of web config files to analyze when AdditionalFileItemNames are configured (see https://security-code-scan.github.io/#Analyzing.aspxandweb.configFiles)
 WebConfigFiles: ^web\.config.*
 
 # Password validator analysis preferences:
-PasswordValidatorRequiredLength: 8
+PasswordValidatorRequiredLength: 12
 MinimumPasswordValidatorProperties: 3
 ## Possible values: RequiredLength, RequireUppercase, RequireDigit, RequireLowercase, RequireNonLetterOrDigit
 PasswordValidatorRequiredProperties: [RequiredLength]

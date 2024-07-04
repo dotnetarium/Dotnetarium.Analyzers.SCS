@@ -49,7 +49,7 @@ namespace WebApplicationSandbox.Controllers
         {{
             {payload} = new PasswordValidator
             {{
-                RequiredLength = 8,
+                RequiredLength = 12,
                 RequireNonLetterOrDigit = true,
                 RequireDigit = true,
                 RequireLowercase = true,
@@ -71,7 +71,7 @@ Namespace WebApplicationSandbox.Controllers
     Public Class TestApp
         Public Sub TestMethod()
             {payload.CSharpReplaceToVBasic()} = New PasswordValidator With {{
-                .RequiredLength = 8,
+                .RequiredLength = 12,
                 .RequireNonLetterOrDigit = True,
                 .RequireDigit = True,
                 .RequireLowercase = True,
@@ -87,7 +87,7 @@ End Namespace
                 await VerifyVisualBasicDiagnostic(visualBasicTest).ConfigureAwait(false);
 
             var testConfig = @"
-PasswordValidatorRequiredLength: 9
+PasswordValidatorRequiredLength: 13
 ";
 
             var optionsWithProjectConfig = ConfigurationTest.CreateAnalyzersOptionsWithConfig(testConfig);
@@ -117,7 +117,7 @@ namespace WebApplicationSandbox.Controllers
         {
             PasswordValidator pwdv = new PasswordValidator
             {
-                RequiredLength = " + 8 + @",
+                RequiredLength = " + 12 + @",
                 RequireNonLetterOrDigit = true,
                 RequireDigit = true,
                 RequireLowercase = true,
@@ -136,7 +136,7 @@ Namespace WebApplicationSandbox.Controllers
     Public Class TestApp
         Public Function TestMethod() As PasswordValidator
             Dim pwdv As New PasswordValidator() With { _
-                .RequiredLength = " + 8 + @", _
+                .RequiredLength = " + 12 + @", _
                 .RequireNonLetterOrDigit = True, _
                 .RequireDigit = True, _
                 .RequireLowercase = True, _
@@ -152,7 +152,7 @@ End Namespace
             await VerifyVisualBasicDiagnostic(visualBasicTest).ConfigureAwait(false);
 
             var testConfig = @"
-PasswordValidatorRequiredLength: 9
+PasswordValidatorRequiredLength: 13
 ";
 
             var optionsWithProjectConfig = ConfigurationTest.CreateAnalyzersOptionsWithConfig(testConfig);
@@ -246,7 +246,7 @@ namespace WebApplicationSandbox.Controllers
         {
             PasswordValidator pwdv = new PasswordValidator
             {
-                RequiredLength = " + 8 + @",
+                RequiredLength = " + 12 + @",
                 RequireNonLetterOrDigit = true,
                 RequireDigit = true,
             };
@@ -263,7 +263,7 @@ Namespace WebApplicationSandbox.Controllers
     Public Class TestApp
         Public Function TestMethod() As PasswordValidator
             Dim pwdv As New PasswordValidator() With { _
-                .RequiredLength = " + 8 + @", _
+                .RequiredLength = " + 12 + @", _
                 .RequireNonLetterOrDigit = True, _
                 .RequireDigit = True _
             }
@@ -306,7 +306,7 @@ namespace WebApplicationSandbox.Controllers
         {
             PasswordValidator pwdv = new PasswordValidator
             {
-                RequiredLength = " + 8 + @",
+                RequiredLength = " + 12 + @",
                 RequireNonLetterOrDigit = true,
             };
             return pwdv;
@@ -322,7 +322,7 @@ Namespace WebApplicationSandbox.Controllers
     Public Class TestApp
         Public Function TestMethod() As PasswordValidator
             Dim pwdv As New PasswordValidator() With { _
-                .RequiredLength = " + 8 + @", _
+                .RequiredLength = " + 12 + @", _
                 .RequireNonLetterOrDigit = True _
             }
             Return pwdv
@@ -370,7 +370,7 @@ namespace WebApplicationSandbox.Controllers
         {
             PasswordValidator pwdv = new PasswordValidator
             {
-                RequiredLength = " + 8 + @"
+                RequiredLength = " + 12 + @"
             };
             return pwdv;
         }
@@ -385,7 +385,7 @@ Namespace WebApplicationSandbox.Controllers
     Public Class TestApp
         Public Function TestMethod() As PasswordValidator
             Dim pwdv As New PasswordValidator() With { _
-                .RequiredLength = " + 8 + @"
+                .RequiredLength = " + 12 + @"
             }
             return pwdv
         End Function
