@@ -2,7 +2,7 @@
 You need to modify the `Config/Main.yml` file to add new entry points, sources, sinks and/or sanitizers.
 Looks scary, but try to find a suitable example in the file and reuse it. 
 
-Some attempt to provide some samples and exlain usage is below.
+An attempt to provide some samples and exlain usage is below.
 
 ## Entry Points
 
