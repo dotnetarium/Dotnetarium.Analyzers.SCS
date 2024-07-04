@@ -1,0 +1,55 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: BuildTest
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: Dotnetarium.Analyzers.SCS.sln
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          8.0.x
+      
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v2      
+
+    - name: Setup VSTest
+      uses: darenm/Setup-VSTest@v1.2
+
+    - name: Restore
+      run: nuget restore $env:Solution_Name
+
+    - name: Build
+      run: msbuild -m $env:Solution_Name /p:Configuration=Release
+
+    - name: Run Tests
+      run: |
+        VSTest.console.exe ./DotnetariumSCS.Test/bin/Release/DotnetariumSCS.Test.dll
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        retention-days: 7
+        name: packages
+        path: |
+          ./DotnetariumSCS/bin/Release/**/*.nupkg
