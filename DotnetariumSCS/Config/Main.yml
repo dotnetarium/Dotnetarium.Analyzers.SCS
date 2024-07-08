@@ -11,7 +11,7 @@ MaxInterproceduralMethodCallChain: 5
 MaxInterproceduralLambdaOrLocalFunctionCallChain: 5
 
 # Generate a list of additional locations for the taint analyzer (experimental feature)
-TaintFlowVisualizationEnabled: false
+TaintFlowVisualizationEnabled: true
 
 # Case insensitive pattern of web config files to analyze when AdditionalFileItemNames are configured (see https://security-code-scan.github.io/#Analyzing.aspxandweb.configFiles)
 WebConfigFiles: ^web\.config.*
