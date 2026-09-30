@@ -103,10 +103,9 @@ controlled comparison showed why this selective port belongs in the engine:
 with the taint visitor fix but the old shared flow files, the captured-local
 case was detected while the static-field helper case remained undetected;
 with the upstream flow files restored, both were detected. The full Windows
-suite also passed with the port before the taint visitor fix. The final
-combination still needs its own CI pass and runtime measurements before this
-draft PR is ready to merge. The reference's four redirect regressions were
-traced to the separate sink-map collision fixed in this PR.
+suite passes with the final combination. Runtime measurements on larger
+projects remain useful before release. The reference's four redirect
+regressions were traced to the separate sink-map collision fixed in this PR.
 
 ### 3. Simplify once the behavior is pinned down
 
