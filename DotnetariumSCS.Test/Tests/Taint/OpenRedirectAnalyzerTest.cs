@@ -65,7 +65,7 @@ class Caller
 }";
             var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
 TaintEntryPoints:
-  OpenRedirect:
+  Caller:
     Method:
       Name: Run
 ");
@@ -98,7 +98,7 @@ class Caller
 }";
             var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
 TaintEntryPoints:
-  OpenRedirect:
+  Caller:
     Method:
       Name: Run
 ");
@@ -128,7 +128,7 @@ class Caller
 }";
             var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
 TaintEntryPoints:
-  OpenRedirect:
+  Caller:
     Method:
       Name: Run
 ");
@@ -165,7 +165,7 @@ class Caller
 }";
             var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
 TaintEntryPoints:
-  OpenRedirect:
+  Caller:
     Method:
       Name: Run
 ");
@@ -299,7 +299,7 @@ class Caller
 }";
             var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
 TaintEntryPoints:
-  OpenRedirect:
+  Caller:
     Method:
       Name: Run
 ");
