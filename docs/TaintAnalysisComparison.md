@@ -130,3 +130,30 @@ regressions were traced to the separate sink-map collision fixed in this PR.
 interpolation, sink-map, and callee-result fixes close confirmed detection
 gaps. Keep the selective upstream flow port because it is also needed for the
 static-field case, while preserving the Dotnetarium taint rules and reporting.
+
+## Confirmed interface dispatch limitation
+
+`dbalikhin/SharpSaster` has an `origin/db_Interface` branch, now contained in
+`main`. Its `Program.cs` registers `IRepo` as `Repo` with `AddTransient`.
+`SqlBasicInterfaceController` accepts `IRepo` in its constructor and later
+passes action parameters to `DoRepoStuff` and `DoRepoEFCoreStuff`; `Repo`
+concatenates those parameters into SQL sinks. The `db_SqlControllers` branch
+predates the interface cases.
+
+Building SharpSaster with this branch's analyzer DLL produced SQL-injection
+warnings in its direct SQL controllers, but none under `InterfaceTests`.
+An isolated open-redirect reproducer also produced no warning when a tainted
+value entered a concrete constructor and its later method was invoked through
+an interface; changing only the receiver's declared type to the concrete class
+produced a warning. The analyzer did detect a separate interface method's
+tainted return value passed directly to a known sink. Thus the missing case is
+dispatch to an implementation body, not all use of interface-typed values.
+
+`TaintedDataSymbolMap` can match source and sink definitions declared on an
+interface. That does not resolve a call on an `IRepo` parameter to `Repo`'s
+method body. The current interprocedural CFG lookup sees the interface method,
+which has no body. A fix needs a constrained target resolver, such as a known
+concrete receiver allocation or a verifiable DI registration. It must keep
+SharpSaster's explicitly initialized `DummyRepo` calls safe; treating every
+implementation as the target would create false positives. This limitation
+is separate from the static-field and captured-local fixes in this PR.
