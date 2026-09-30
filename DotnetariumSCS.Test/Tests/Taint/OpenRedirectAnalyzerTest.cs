@@ -262,6 +262,20 @@ class Startup
             Assert.AreEqual("Second", all[1].Name);
             Assert.IsTrue(model.TryGetImplementations(service, multiple: false, out var single));
             Assert.AreEqual("Second", single[0].Name);
+
+            var anotherSite = CSharpSyntaxTree.ParseText(@"
+using Microsoft.Extensions.DependencyInjection;
+class OtherStartup
+{
+    void Configure(IServiceCollection services)
+    {
+        services.AddScoped<IRedirector, First>();
+    }
+}");
+            var ambiguousCompilation = compilation.AddSyntaxTrees(anotherSite);
+            var ambiguousService = ambiguousCompilation.GetTypeByMetadataName("IRedirector");
+            Assert.IsFalse(DependencyInjectionRegistrationModel.GetOrCreate(ambiguousCompilation)
+                .TryGetImplementations(ambiguousService, multiple: false, out _));
         }
 
         [TestMethod]
