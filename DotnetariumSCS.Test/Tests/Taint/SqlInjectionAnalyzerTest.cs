@@ -58,7 +58,7 @@ namespace DotnetariumSCS.Test.Taint
             var code = @"
 using System.Data.SqlClient;
 
-interface IRepo { void Find(string value); }
+public interface IRepo { void Find(string value); }
 class Repo : IRepo
 {
     public void Find(string value)
