@@ -253,6 +253,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 if (ret.Kind == TaintedDataAbstractValueKind.Tainted)
                 {
+                    List<TaintedDataAbstractValue>? unsafeValues = null;
                     bool hasSanitizedTaint = false;
                     foreach (IOperation part in operation.Parts)
                     {
@@ -269,9 +270,15 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                             continue;
                         }
 
-                        // A safe interpolation must not clear taint from another part.
-                        return ret;
+                        unsafeValues ??= new List<TaintedDataAbstractValue>();
+                        unsafeValues.Add(partValue);
                     }
+
+                    if (unsafeValues?.Count == 1)
+                        return unsafeValues[0];
+
+                    if (unsafeValues?.Count > 1)
+                        return TaintedDataAbstractValue.MergeTainted(unsafeValues);
 
                     if (hasSanitizedTaint)
                         return ValueDomain.UnknownOrMayBeValue;
