@@ -3576,6 +3576,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         protected INamedTypeSymbol? TryGetFieldInitializerType(IOperation instance)
         {
             if (instance is not IFieldReferenceOperation fieldReference ||
+                !fieldReference.Field.IsReadOnly ||
                 fieldReference.Field.DeclaringSyntaxReferences.Length != 1)
             {
                 return null;

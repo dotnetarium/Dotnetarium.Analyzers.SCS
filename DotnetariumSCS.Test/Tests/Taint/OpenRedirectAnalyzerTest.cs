@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.CSharp;
+using Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Dotnetarium.Analyzers.Taint;
 using DotnetariumSCS.Test.Config;
@@ -133,6 +135,113 @@ TaintEntryPoints:
       Name: Run
 ");
             await VerifyCSharpDiagnostic(code, null, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task MutableFieldInitializerDoesNotHideOtherImplementation()
+        {
+            var code = @"
+using System.Web;
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector { public void Go(string url) { Holder.Response.Redirect(url); } }
+class SafeRedirector : IRedirector { public void Go(string url) { } }
+static class Holder { public static HttpResponse Response = null; }
+class Caller
+{
+    public IRedirector redirector = new SafeRedirector();
+    public void Run(string url) { redirector.Go(url); }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  Caller:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+        }
+
+        [DataRow("services.AddScoped<IRedirector, UnsafeRedirector>(); services.AddScoped<IRedirector, SafeRedirector>();", false)]
+        [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.AddScoped<IRedirector, UnsafeRedirector>();", true)]
+        [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.TryAddScoped<IRedirector, UnsafeRedirector>();", false)]
+        [DataRow("services.AddScoped<IRedirector, UnsafeRedirector>(); services.TryAddScoped<IRedirector, SafeRedirector>();", true)]
+        [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.AddScoped<IRedirector>(provider => new UnsafeRedirector());", true)]
+        [DataRow("if (flag) services.AddScoped<IRedirector, SafeRedirector>();", true)]
+        [DataTestMethod]
+        public async Task BuiltInDiRegistrationsNarrowOnlyCertainInjectedTargets(string registrations, bool warn)
+        {
+            var code = $@"
+using System;
+using System.Web;
+using Microsoft.Extensions.DependencyInjection;
+namespace Microsoft.Extensions.DependencyInjection
+{{
+    public interface IServiceCollection {{ }}
+    public static class ServiceCollectionServiceExtensions
+    {{
+        public static IServiceCollection AddScoped<TService, TImplementation>(this IServiceCollection services)
+            where TImplementation : TService => services;
+        public static IServiceCollection TryAddScoped<TService, TImplementation>(this IServiceCollection services)
+            where TImplementation : TService => services;
+        public static IServiceCollection AddScoped<TService>(this IServiceCollection services, Func<object, TService> factory) => services;
+    }}
+}}
+interface IRedirector {{ void Go(string url); }}
+class UnsafeRedirector : IRedirector {{ public void Go(string url) {{ Holder.Response.Redirect(url); }} }}
+class SafeRedirector : IRedirector {{ public void Go(string url) {{ }} }}
+static class Holder {{ public static HttpResponse Response = null; }}
+static class Startup {{ public static void Configure(IServiceCollection services, bool flag) {{ {registrations} }} }}
+class Caller : Microsoft.AspNetCore.Mvc.ControllerBase
+{{
+    private readonly IRedirector redirector;
+    public Caller(IRedirector redirector) {{ this.redirector = redirector; }}
+    public void Run(string url) {{ redirector.Go(url); }}
+}}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  Caller:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, warn ? Expected : null, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public void BuiltInDiEnumerablePreservesAllRegistrations()
+        {
+            var code = @"
+using Microsoft.Extensions.DependencyInjection;
+namespace Microsoft.Extensions.DependencyInjection
+{
+    public interface IServiceCollection { }
+    public static class ServiceCollectionServiceExtensions
+    {
+        public static IServiceCollection AddScoped<TService, TImplementation>(this IServiceCollection services)
+            where TImplementation : TService => services;
+    }
+}
+interface IRedirector { }
+class First : IRedirector { }
+class Second : IRedirector { }
+class Startup
+{
+    void Configure(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
+    {
+        services.AddScoped<IRedirector, First>();
+        services.AddScoped<IRedirector, Second>();
+    }
+}";
+            var compilation = CSharpCompilation.Create("DiModel",
+                new[] { CSharpSyntaxTree.ParseText(code) },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) });
+            var service = compilation.GetTypeByMetadataName("IRedirector");
+            var model = DependencyInjectionRegistrationModel.GetOrCreate(compilation);
+
+            Assert.IsTrue(model.TryGetImplementations(service, multiple: true, out var all));
+            Assert.AreEqual(2, all.Length);
+            Assert.AreEqual("First", all[0].Name);
+            Assert.AreEqual("Second", all[1].Name);
+            Assert.IsTrue(model.TryGetImplementations(service, multiple: false, out var single));
+            Assert.AreEqual("Second", single[0].Name);
         }
 
         [TestMethod]

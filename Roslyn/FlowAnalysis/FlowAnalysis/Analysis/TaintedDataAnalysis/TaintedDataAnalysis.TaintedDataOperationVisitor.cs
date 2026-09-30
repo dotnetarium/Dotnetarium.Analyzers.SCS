@@ -14,6 +14,7 @@ using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 {
@@ -539,7 +540,8 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 }
 
                 var receiver = GetPointsToAbstractValue(instance);
-                if (receiver.Kind == PointsToAbstractValueKind.KnownLocations)
+                if (receiver.Kind == PointsToAbstractValueKind.KnownLocations &&
+                    (instance is not IFieldReferenceOperation field || field.Field.IsReadOnly))
                 {
                     var knownTypes = receiver.Locations
                         .Select(location => location.LocationType)
@@ -562,6 +564,21 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                     initializedTarget.Locations.Any(location => location.IsInSource))
                 {
                     return ImmutableArray.Create(initializedTarget);
+                }
+
+                if (IsConstructorInjectedField(instance, method.ContainingType) &&
+                    DependencyInjectionRegistrationModel.GetOrCreate(WellKnownTypeProvider.Compilation)
+                        .TryGetImplementations(method.ContainingType, multiple: false, out var registeredTypes))
+                {
+                    var registeredTargets = registeredTypes
+                        .Select(type => type.FindImplementationForInterfaceMember(method))
+                        .OfType<IMethodSymbol>()
+                        .Where(target => target.Locations.Any(location => location.IsInSource))
+                        .ToImmutableArray();
+                    if (registeredTargets.Length == registeredTypes.Length)
+                    {
+                        return registeredTargets;
+                    }
                 }
 
                 // For a receiver supplied outside this method (for example, constructor
@@ -607,6 +624,60 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                         AddTypeImplementations(nestedType);
                     }
                 }
+            }
+
+            private bool IsConstructorInjectedField(IOperation instance, INamedTypeSymbol serviceType)
+            {
+                if (instance is not IFieldReferenceOperation fieldReference ||
+                    !fieldReference.Field.IsReadOnly ||
+                    !SymbolEqualityComparer.Default.Equals(fieldReference.Field.Type, serviceType))
+                {
+                    return false;
+                }
+
+                var owner = fieldReference.Field.ContainingType;
+                var isController = false;
+                for (var baseType = owner; baseType != null; baseType = baseType.BaseType)
+                {
+                    if (baseType.ToDisplayString() == "Microsoft.AspNetCore.Mvc.ControllerBase")
+                    {
+                        isController = true;
+                        break;
+                    }
+                }
+
+                if (!isController)
+                {
+                    return false;
+                }
+
+                var foundAssignment = false;
+                foreach (var syntaxReference in owner.DeclaringSyntaxReferences)
+                {
+                    var syntax = syntaxReference.GetSyntax();
+                    var semanticModel = WellKnownTypeProvider.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                    foreach (var assignmentSyntax in syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        if (semanticModel.GetOperation(assignmentSyntax) is not ISimpleAssignmentOperation assignment ||
+                            assignment.Target is not IFieldReferenceOperation target ||
+                            !SymbolEqualityComparer.Default.Equals(target.Field, fieldReference.Field))
+                        {
+                            continue;
+                        }
+
+                        if (assignment.Value is not IParameterReferenceOperation parameter ||
+                            !SymbolEqualityComparer.Default.Equals(parameter.Parameter.Type, serviceType) ||
+                            parameter.Parameter.ContainingSymbol is not IMethodSymbol constructor ||
+                            constructor.MethodKind != MethodKind.Constructor)
+                        {
+                            return false;
+                        }
+
+                        foundAssignment = true;
+                    }
+                }
+
+                return foundAssignment;
             }
 
             public override TaintedDataAbstractValue VisitInvocation_LocalFunction(IMethodSymbol localFunction, ImmutableArray<IArgumentOperation> visitedArguments, IOperation originalOperation, TaintedDataAbstractValue defaultValue)
