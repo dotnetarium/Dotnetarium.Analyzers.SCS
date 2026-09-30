@@ -253,22 +253,28 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 if (ret.Kind == TaintedDataAbstractValueKind.Tainted)
                 {
-                    foreach (var interpolation in operation.Children)
+                    bool hasSanitizedTaint = false;
+                    foreach (IOperation part in operation.Parts)
                     {
-                        if (interpolation.Type != null)
-                            throw new Exception($"interpolation.Type was not null but {interpolation.Type}");
-
-                        bool shouldSanitize = true;
-                        foreach (var child in interpolation.Children)
+                        TaintedDataAbstractValue partValue = GetCachedAbstractValue(part);
+                        if (partValue.Kind != TaintedDataAbstractValueKind.Tainted)
                         {
-                            shouldSanitize = ShouldSanitizeConversion(SpecialType.System_String, child);
-                            if (!shouldSanitize)
-                                break;
+                            continue;
                         }
 
-                        if (shouldSanitize)
-                            return ValueDomain.UnknownOrMayBeValue;
+                        if (part is IInterpolationOperation interpolation
+                            && ShouldSanitizeConversion(SpecialType.System_String, interpolation.Expression))
+                        {
+                            hasSanitizedTaint = true;
+                            continue;
+                        }
+
+                        // A safe interpolation must not clear taint from another part.
+                        return ret;
                     }
+
+                    if (hasSanitizedTaint)
+                        return ValueDomain.UnknownOrMayBeValue;
                 }
 
                 return ret;
