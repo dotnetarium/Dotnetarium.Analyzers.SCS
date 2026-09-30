@@ -14,6 +14,7 @@ using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 {
@@ -24,6 +25,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         private sealed class TaintedDataOperationVisitor : AnalysisEntityDataFlowOperationVisitor<TaintedDataAnalysisData, TaintedDataAnalysisContext, TaintedDataAnalysisResult, TaintedDataAbstractValue>
         {
             private readonly TaintedDataAnalysisDomain _taintedDataAnalysisDomain;
+            private readonly Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>> _interfaceTargets = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>();
 
             /// <summary>
             /// Mapping of a tainted data sinks to their originating sources.
@@ -253,22 +255,35 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 if (ret.Kind == TaintedDataAbstractValueKind.Tainted)
                 {
-                    foreach (var interpolation in operation.Children)
+                    List<TaintedDataAbstractValue>? unsafeValues = null;
+                    bool hasSanitizedTaint = false;
+                    foreach (IOperation part in operation.Parts)
                     {
-                        if (interpolation.Type != null)
-                            throw new Exception($"interpolation.Type was not null but {interpolation.Type}");
-
-                        bool shouldSanitize = true;
-                        foreach (var child in interpolation.Children)
+                        TaintedDataAbstractValue partValue = GetCachedAbstractValue(part);
+                        if (partValue.Kind != TaintedDataAbstractValueKind.Tainted)
                         {
-                            shouldSanitize = ShouldSanitizeConversion(SpecialType.System_String, child);
-                            if (!shouldSanitize)
-                                break;
+                            continue;
                         }
 
-                        if (shouldSanitize)
-                            return ValueDomain.UnknownOrMayBeValue;
+                        if (part is IInterpolationOperation interpolation
+                            && ShouldSanitizeConversion(SpecialType.System_String, interpolation.Expression))
+                        {
+                            hasSanitizedTaint = true;
+                            continue;
+                        }
+
+                        unsafeValues ??= new List<TaintedDataAbstractValue>();
+                        unsafeValues.Add(partValue);
                     }
+
+                    if (unsafeValues?.Count == 1)
+                        return unsafeValues[0];
+
+                    if (unsafeValues?.Count > 1)
+                        return TaintedDataAbstractValue.MergeTainted(unsafeValues);
+
+                    if (hasSanitizedTaint)
+                        return ValueDomain.UnknownOrMayBeValue;
                 }
 
                 return ret;
@@ -322,7 +337,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             {
                 TaintedDataAbstractValue baseValue = base.VisitObjectCreation(operation, argument);
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(operation.Arguments);
-                if (taintedArguments.Any())
+                if (operation.Constructor != null)
                 {
                     ProcessTaintedDataEnteringInvocationOrCreation(operation.Constructor, operation.Arguments, taintedArguments, operation);
                 }
@@ -338,20 +353,43 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 IOperation originalOperation,
                 TaintedDataAbstractValue defaultValue)
             {
-                // Always invoke base visit.
-                TaintedDataAbstractValue result = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
-                    method,
-                    visitedInstance,
-                    visitedArguments,
-                    invokedAsDelegate,
-                    originalOperation,
-                    defaultValue);
-
+                var targets = GetInterfaceTargets(method, visitedInstance);
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                if (taintedArguments.Any())
+                TaintedDataAbstractValue result = defaultValue;
+                if (targets.IsDefaultOrEmpty)
                 {
-                    ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);
+                    result = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
+                        method, visitedInstance, visitedArguments, invokedAsDelegate, originalOperation, defaultValue);
                 }
+                else
+                {
+                    using var inputAnalysisData = GetClonedCurrentAnalysisData();
+                    TaintedDataAnalysisData? mergedAnalysisData = null;
+                    foreach (var target in targets)
+                    {
+                        CurrentAnalysisData = GetClonedAnalysisData(inputAnalysisData);
+                        var targetResult = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
+                            target, visitedInstance, visitedArguments, invokedAsDelegate, originalOperation, defaultValue);
+                        ProcessTaintedDataEnteringInvocationOrCreation(target, visitedArguments, taintedArguments, originalOperation);
+                        result = ValueDomain.Merge(result, targetResult);
+
+                        if (mergedAnalysisData == null)
+                        {
+                            mergedAnalysisData = CurrentAnalysisData;
+                        }
+                        else
+                        {
+                            var merged = MergeAnalysisData(mergedAnalysisData, CurrentAnalysisData);
+                            mergedAnalysisData.Dispose();
+                            CurrentAnalysisData.Dispose();
+                            mergedAnalysisData = merged;
+                        }
+                    }
+
+                    CurrentAnalysisData = mergedAnalysisData!;
+                }
+
+                ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);
 
                 PooledHashSet<string>? taintedTargets = null;
                 PooledHashSet<(string, string)>? taintedParameterPairs = null;
@@ -494,16 +532,161 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 return result;
             }
 
+            private ImmutableArray<IMethodSymbol> GetInterfaceTargets(IMethodSymbol method, IOperation? instance)
+            {
+                if (instance == null || method.ContainingType.TypeKind != TypeKind.Interface)
+                {
+                    return ImmutableArray<IMethodSymbol>.Empty;
+                }
+
+                var receiver = GetPointsToAbstractValue(instance);
+                if (receiver.Kind == PointsToAbstractValueKind.KnownLocations &&
+                    (instance is not IFieldReferenceOperation field || field.Field.IsReadOnly))
+                {
+                    var knownTypes = receiver.Locations
+                        .Select(location => location.LocationType)
+                        .OfType<INamedTypeSymbol>()
+                        .Where(type => type.TypeKind == TypeKind.Class || type.TypeKind == TypeKind.Struct)
+                        .Distinct();
+                    var targets = knownTypes
+                        .Select(type => type.FindImplementationForInterfaceMember(method))
+                        .OfType<IMethodSymbol>()
+                        .Where(target => target.Locations.Any(location => location.IsInSource))
+                        .ToImmutableArray();
+                    if (targets.Length != 0)
+                    {
+                        return targets;
+                    }
+                }
+
+                if (TryGetFieldInitializerType(instance) is INamedTypeSymbol initializedType &&
+                    initializedType.FindImplementationForInterfaceMember(method) is IMethodSymbol initializedTarget &&
+                    initializedTarget.Locations.Any(location => location.IsInSource))
+                {
+                    return ImmutableArray.Create(initializedTarget);
+                }
+
+                if (IsConstructorInjectedField(instance, method.ContainingType) &&
+                    DependencyInjectionRegistrationModel.GetOrCreate(WellKnownTypeProvider.Compilation)
+                        .TryGetImplementations(method.ContainingType, multiple: false, out var registeredTypes))
+                {
+                    var registeredTargets = registeredTypes
+                        .Select(type => type.FindImplementationForInterfaceMember(method))
+                        .OfType<IMethodSymbol>()
+                        .Where(target => target.Locations.Any(location => location.IsInSource))
+                        .ToImmutableArray();
+                    if (registeredTargets.Length == registeredTypes.Length)
+                    {
+                        return registeredTargets;
+                    }
+                }
+
+                // For a receiver supplied outside this method (for example, constructor
+                // injection), the implementation is unknown. Analyze every implementation
+                // visible in this compilation as a possible target.
+                if (_interfaceTargets.TryGetValue(method, out var cachedTargets))
+                {
+                    return cachedTargets;
+                }
+
+                var builder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+                AddImplementations(WellKnownTypeProvider.Compilation.GlobalNamespace);
+                var possibleTargets = builder.Distinct().ToImmutableArray();
+                _interfaceTargets.Add(method, possibleTargets);
+                return possibleTargets;
+
+                void AddImplementations(INamespaceSymbol namespaceSymbol)
+                {
+                    foreach (var type in namespaceSymbol.GetTypeMembers())
+                    {
+                        AddTypeImplementations(type);
+                    }
+
+                    foreach (var child in namespaceSymbol.GetNamespaceMembers())
+                    {
+                        AddImplementations(child);
+                    }
+                }
+
+                void AddTypeImplementations(INamedTypeSymbol type)
+                {
+                    if (!type.IsAbstract && type.AllInterfaces.Contains(method.ContainingType))
+                    {
+                        if (type.FindImplementationForInterfaceMember(method) is IMethodSymbol target &&
+                            target.Locations.Any(location => location.IsInSource))
+                        {
+                            builder.Add(target);
+                        }
+                    }
+
+                    foreach (var nestedType in type.GetTypeMembers())
+                    {
+                        AddTypeImplementations(nestedType);
+                    }
+                }
+            }
+
+            private bool IsConstructorInjectedField(IOperation instance, INamedTypeSymbol serviceType)
+            {
+                if (instance is not IFieldReferenceOperation fieldReference ||
+                    !fieldReference.Field.IsReadOnly ||
+                    !SymbolEqualityComparer.Default.Equals(fieldReference.Field.Type, serviceType))
+                {
+                    return false;
+                }
+
+                var owner = fieldReference.Field.ContainingType;
+                var isController = false;
+                for (var baseType = owner; baseType != null; baseType = baseType.BaseType)
+                {
+                    if (baseType.ToDisplayString() == "Microsoft.AspNetCore.Mvc.ControllerBase")
+                    {
+                        isController = true;
+                        break;
+                    }
+                }
+
+                if (!isController)
+                {
+                    return false;
+                }
+
+                var foundAssignment = false;
+                foreach (var syntaxReference in owner.DeclaringSyntaxReferences)
+                {
+                    var syntax = syntaxReference.GetSyntax();
+                    var semanticModel = WellKnownTypeProvider.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                    foreach (var assignmentSyntax in syntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                    {
+                        if (semanticModel.GetOperation(assignmentSyntax) is not ISimpleAssignmentOperation assignment ||
+                            assignment.Target is not IFieldReferenceOperation target ||
+                            !SymbolEqualityComparer.Default.Equals(target.Field, fieldReference.Field))
+                        {
+                            continue;
+                        }
+
+                        if (assignment.Value is not IParameterReferenceOperation parameter ||
+                            !SymbolEqualityComparer.Default.Equals(parameter.Parameter.Type, serviceType) ||
+                            parameter.Parameter.ContainingSymbol is not IMethodSymbol constructor ||
+                            constructor.MethodKind != MethodKind.Constructor)
+                        {
+                            return false;
+                        }
+
+                        foundAssignment = true;
+                    }
+                }
+
+                return foundAssignment;
+            }
+
             public override TaintedDataAbstractValue VisitInvocation_LocalFunction(IMethodSymbol localFunction, ImmutableArray<IArgumentOperation> visitedArguments, IOperation originalOperation, TaintedDataAbstractValue defaultValue)
             {
                 // Always invoke base visit.
                 TaintedDataAbstractValue baseValue = base.VisitInvocation_LocalFunction(localFunction, visitedArguments, originalOperation, defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                if (taintedArguments.Any())
-                {
-                    ProcessTaintedDataEnteringInvocationOrCreation(localFunction, visitedArguments, taintedArguments, originalOperation);
-                }
+                ProcessTaintedDataEnteringInvocationOrCreation(localFunction, visitedArguments, taintedArguments, originalOperation);
 
                 return baseValue;
             }
@@ -514,10 +697,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 TaintedDataAbstractValue baseValue = base.VisitInvocation_Lambda(lambda, visitedArguments, originalOperation, defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                if (taintedArguments.Any())
-                {
-                    ProcessTaintedDataEnteringInvocationOrCreation(lambda.Symbol, visitedArguments, taintedArguments, originalOperation);
-                }
+                ProcessTaintedDataEnteringInvocationOrCreation(lambda.Symbol, visitedArguments, taintedArguments, originalOperation);
 
                 return baseValue;
             }
@@ -629,7 +809,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             }
 
             /// <summary>
-            /// Determines if tainted data is entering a sink as a method call or constructor argument, and if so, flags it.
+            /// Flags tainted arguments entering a sink and merges sinks found inside the callee.
+            /// The callee must be checked even without tainted arguments: it can read tainted
+            /// static state or capture a tainted local variable.
             /// </summary>
             /// <param name="targetMethod">Method being invoked.</param>
             /// <param name="taintedArguments">Arguments with tainted data to the method.</param>

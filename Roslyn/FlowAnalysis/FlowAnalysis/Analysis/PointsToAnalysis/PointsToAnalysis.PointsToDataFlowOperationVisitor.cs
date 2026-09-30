@@ -1,4 +1,5 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the MIT license.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Collections.Generic;
@@ -601,11 +602,13 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
                 return trimmedData;
             }
 
-            protected override PointsToAnalysisData GetInitialInterproceduralAnalysisData(
+            protected override (PointsToAnalysisData Data, bool IsTrimmed) GetInitialInterproceduralAnalysisData(
                 IMethodSymbol invokedMethod,
+                ControlFlowGraph invokedCfg,
                 (AnalysisEntity? Instance, PointsToAbstractValue PointsToValue)? invocationInstance,
                 (AnalysisEntity Instance, PointsToAbstractValue PointsToValue)? thisOrMeInstanceForCaller,
                 ImmutableDictionary<IParameterSymbol, ArgumentInfo<PointsToAbstractValue>> argumentValuesMap,
+                ImmutableDictionary<ISymbol, PointsToAbstractValue> capturedVariablesMap,
                 IDictionary<AnalysisEntity, PointsToAbstractValue>? pointsToValues,
                 IDictionary<AnalysisEntity, CopyAbstractValue>? copyValues,
                 IDictionary<AnalysisEntity, ValueContentAbstractValue>? valueContentValues,
@@ -613,10 +616,10 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis
                 bool hasParameterWithDelegateType)
             {
                 pointsToValues = CurrentAnalysisData.CoreAnalysisData;
-                var initialAnalysisData = base.GetInitialInterproceduralAnalysisData(invokedMethod,
-                    invocationInstance, thisOrMeInstanceForCaller, argumentValuesMap, pointsToValues,
+                var initialAnalysisData = base.GetInitialInterproceduralAnalysisData(invokedMethod, invokedCfg,
+                    invocationInstance, thisOrMeInstanceForCaller, argumentValuesMap, capturedVariablesMap, pointsToValues,
                     copyValues, valueContentValues, isLambdaOrLocalFunction, hasParameterWithDelegateType);
-                AssertValidPointsToAnalysisData(initialAnalysisData);
+                AssertValidPointsToAnalysisData(initialAnalysisData.Data);
                 return initialAnalysisData;
             }
 

@@ -53,6 +53,42 @@ namespace DotnetariumSCS.Test.Taint
     protected override IEnumerable<MetadataReference> GetAdditionalReferences() => References;
 
         [TestMethod]
+        public async Task SqlInjectionThroughConstructorInjectedInterface()
+        {
+            var code = @"
+using System.Data.SqlClient;
+
+public interface IRepo { void Find(string value); }
+class Repo : IRepo
+{
+    public void Find(string value)
+    {
+        var command = new SqlCommand();
+        command.CommandText = ""SELECT * FROM Users WHERE Name = '"" + value + ""'"";
+        command.ExecuteReader();
+    }
+}
+class SafeRepo : IRepo
+{
+    public void Find(string value) { }
+}
+public class EntryController
+{
+    private readonly IRepo repo;
+    public EntryController(IRepo repo) { this.repo = repo; }
+    public void Run(string value) { repo.Find(value); }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  EntryController:
+    Method:
+      Name: Run
+");
+            var expected = new DiagnosticResult { Id = "SCS0002", Severity = DiagnosticSeverity.Warning };
+            await VerifyCSharpDiagnostic(code, expected, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
         public async Task SqlInjectionEnterpriseLibraryDataParametrized()
         {
             var cSharpTest = @"

@@ -1,4 +1,5 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the MIT license.  See License.txt in the project root for license information.
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Collections.Generic;
@@ -174,7 +175,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 Debug.Assert(!_currentAnalysisData.IsDisposed);
                 return _currentAnalysisData;
             }
-            private set
+            set
             {
                 Debug.Assert(!value.IsDisposed);
                 _currentAnalysisData = value;
@@ -2120,24 +2121,26 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         /// for interprocedural analysis.
         /// The default implementation returns cloned CurrentAnalysisData.
         /// </summary>
-        protected virtual TAnalysisData GetInitialInterproceduralAnalysisData(
+        protected virtual (TAnalysisData Data, bool IsTrimmed) GetInitialInterproceduralAnalysisData(
             IMethodSymbol invokedMethod,
+            ControlFlowGraph invokedCfg,
             (AnalysisEntity? Instance, PointsToAbstractValue PointsToValue)? invocationInstance,
             (AnalysisEntity Instance, PointsToAbstractValue PointsToValue)? thisOrMeInstanceForCaller,
             ImmutableDictionary<IParameterSymbol, ArgumentInfo<TAbstractAnalysisValue>> argumentValuesMap,
+            ImmutableDictionary<ISymbol, PointsToAbstractValue> capturedVariablesMap,
             IDictionary<AnalysisEntity, PointsToAbstractValue>? pointsToValues,
             IDictionary<AnalysisEntity, CopyAbstractValue>? copyValues,
             IDictionary<AnalysisEntity, ValueContentAbstractValue>? valueContentValues,
             bool isLambdaOrLocalFunction,
             bool hasParameterWithDelegateType)
-            => GetClonedCurrentAnalysisData();
+            => (GetClonedCurrentAnalysisData(), false);
 
         /// <summary>
         /// Apply the result data from interprocedural analysis to CurrentAnalysisData.
         /// Default implementation is designed for the default implementation of GetInitialInterproceduralAnalysisData.
         /// and overwrites the CurrentAnalysisData with the given <paramref name="resultData"/>.
         /// </summary>
-        protected virtual void ApplyInterproceduralAnalysisResult(TAnalysisData resultData, bool isLambdaOrLocalFunction, bool hasDelegateTypeArgument, TAnalysisResult analysisResult)
+        protected virtual void ApplyInterproceduralAnalysisResult(TAnalysisData resultData, bool isLambdaOrLocalFunction, bool hasDelegateTypeArgument, TAnalysisResult analysisResult, bool initialDataIsTrimmed)
             => CurrentAnalysisData = resultData;
 
         private void ApplyInterproceduralAnalysisDataForUnhandledThrowOperations(Dictionary<ThrownExceptionInfo, TAnalysisData> interproceduralUnhandledThrowOperationsData)
@@ -2203,7 +2206,6 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             IOperation originalOperation,
             TAbstractAnalysisValue defaultValue,
             bool isLambdaOrLocalFunction,
-            CancellationToken cancellationToken,
             out bool wasAnalyzed)
         {
             wasAnalyzed = false;
@@ -2214,7 +2216,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             // Bail out if configured not to execute interprocedural analysis.
             var skipInterproceduralAnalysis = !isLambdaOrLocalFunction && InterproceduralAnalysisKind == InterproceduralAnalysisKind.None ||
                 DataFlowAnalysisContext.InterproceduralAnalysisPredicate?.SkipInterproceduralAnalysis(invokedMethod, isLambdaOrLocalFunction) == true ||
-                DataFlowAnalysisContext.AnalyzerOptions.IsConfiguredToSkipAnalysis(s_dummyDataflowAnalysisDescriptor, invokedMethod, OwningSymbol, WellKnownTypeProvider.Compilation, cancellationToken);
+                DataFlowAnalysisContext.AnalyzerOptions.IsConfiguredToSkipAnalysis(s_dummyDataflowAnalysisDescriptor, invokedMethod, WellKnownTypeProvider.Compilation, CancellationToken.None);
 
             // Also bail out for non-source methods and methods where we are not sure about the actual runtime target method.
             if (skipInterproceduralAnalysis ||
@@ -2272,7 +2274,8 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
 
             // Compute optional interprocedural analysis data for context-sensitive analysis.
             bool isContextSensitive = isLambdaOrLocalFunction || InterproceduralAnalysisKind == InterproceduralAnalysisKind.ContextSensitive;
-            var interproceduralAnalysisData = isContextSensitive ? ComputeInterproceduralAnalysisData() : null;
+            bool initialDataIsTrimmed = false;
+            var interproceduralAnalysisData = isContextSensitive ? ComputeInterproceduralAnalysisData(out initialDataIsTrimmed) : null;
             TAnalysisResult? analysisResult;
 
             try
@@ -2326,7 +2329,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
 
                     // Apply interprocedural result analysis data for non-exception paths.
                     var resultData = GetExitBlockOutputData(analysisResult);
-                    ApplyInterproceduralAnalysisResult(resultData, isLambdaOrLocalFunction, hasParameterWithDelegateType, analysisResult);
+                    ApplyInterproceduralAnalysisResult(resultData, isLambdaOrLocalFunction, hasParameterWithDelegateType, analysisResult, initialDataIsTrimmed);
 
                     Debug.Assert(arguments.All(arg => !_pendingArgumentsToReset.Contains(arg)));
                 }
@@ -2426,7 +2429,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 return hasEscapes;
             }
 
-            InterproceduralAnalysisData<TAnalysisData, TAnalysisContext, TAbstractAnalysisValue> ComputeInterproceduralAnalysisData()
+            InterproceduralAnalysisData<TAnalysisData, TAnalysisContext, TAbstractAnalysisValue> ComputeInterproceduralAnalysisData(out bool isTrimmed)
             {
                 RoslynDebug.Assert(cfg != null);
 
@@ -2436,15 +2439,17 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 var pointsToValues = pointsToAnalysisResult?[cfg.GetEntry()].Data;
                 var copyValues = copyAnalysisResult?[cfg.GetEntry()].Data;
                 var valueContentValues = valueContentAnalysisResult?[cfg.GetEntry()].Data;
-                var initialAnalysisData = GetInitialInterproceduralAnalysisData(invokedMethod, invocationInstance,
-                    thisOrMeInstance, argumentValuesMap, pointsToValues, copyValues, valueContentValues, isLambdaOrLocalFunction, hasParameterWithDelegateType);
+                var capturedVariablesMap = GetCapturedVariablesMap(cfg, invokedMethod, isLambdaOrLocalFunction);
+                var (initialAnalysisData, initialDataIsTrimmed) = GetInitialInterproceduralAnalysisData(invokedMethod, cfg, invocationInstance,
+                    thisOrMeInstance, argumentValuesMap, capturedVariablesMap, pointsToValues, copyValues, valueContentValues, isLambdaOrLocalFunction, hasParameterWithDelegateType);
+                isTrimmed = initialDataIsTrimmed;
 
                 return new InterproceduralAnalysisData<TAnalysisData, TAnalysisContext, TAbstractAnalysisValue>(
                     initialAnalysisData,
                     invocationInstance,
                     thisOrMeInstance,
                     argumentValuesMap,
-                    GetCapturedVariablesMap(cfg, invokedMethod, isLambdaOrLocalFunction),
+                    capturedVariablesMap,
                     _addressSharedEntitiesProvider.GetAddressedSharedEntityMap(),
                     ImmutableStack.CreateRange(_interproceduralCallStack),
                     newMethodsBeingAnalyzed,
@@ -2548,11 +2553,11 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                     IParameterSymbol GetMappedParameterForArgument(IArgumentOperation argumentOperation)
                     {
                         if (argumentOperation.Parameter!.ContainingSymbol is IMethodSymbol method &&
-                            method.MethodKind == MethodKind.DelegateInvoke)
+                            (method.MethodKind == MethodKind.DelegateInvoke ||
+                             !method.OriginalDefinition.Equals(invokedMethod.OriginalDefinition)))
                         {
-                            // Parameter associated with IArgumentOperation for delegate invocations
-                            // is the DelegateInvoke method parameter.
-                            // So we need to map it to the parameter of the invoked method by using ordinals.
+                            // Delegate and interface invocation arguments refer to parameters on
+                            // the declared target, rather than on the method body being analyzed.
                             Debug.Assert(invokedMethod.Parameters.Length == method.GetParameters().Length ||
                                 isExtensionMethodInvocationWithOneLessArgument);
 
@@ -3161,7 +3166,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             ControlFlowGraph? getCfg() => GetInterproceduralControlFlowGraph(method);
 
             return PerformInterproceduralAnalysis(getCfg, method, instanceReceiver: null,
-                operation.Arguments, operation, defaultValue, isLambdaOrLocalFunction: false, cancellationToken: CancellationToken.None, out _);
+                operation.Arguments, operation, defaultValue, isLambdaOrLocalFunction: false, out _);
         }
 
         public sealed override TAbstractAnalysisValue VisitInvocation(IInvocationOperation operation, object? argument)
@@ -3536,10 +3541,81 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             IOperation originalOperation,
             TAbstractAnalysisValue defaultValue)
         {
+            if (method.ContainingType.TypeKind == TypeKind.Interface && visitedInstance != null)
+            {
+                var receiver = GetPointsToAbstractValue(visitedInstance);
+                if (receiver.Kind == PointsToAbstractValueKind.KnownLocations)
+                {
+                    var targets = receiver.Locations
+                        .Select(location => location.LocationType)
+                        .OfType<INamedTypeSymbol>()
+                        .Select(type => type.FindImplementationForInterfaceMember(method))
+                        .OfType<IMethodSymbol>()
+                        .Distinct()
+                        .ToImmutableArray();
+                    if (targets.Length == 1)
+                    {
+                        method = targets[0];
+                    }
+                }
+
+                if (method.ContainingType.TypeKind == TypeKind.Interface &&
+                    TryGetFieldInitializerType(visitedInstance) is INamedTypeSymbol initializedType &&
+                    initializedType.FindImplementationForInterfaceMember(method) is IMethodSymbol initializedTarget)
+                {
+                    method = initializedTarget;
+                }
+            }
+
             ControlFlowGraph? getCfg() => GetInterproceduralControlFlowGraph(method);
 
             return PerformInterproceduralAnalysis(getCfg, method, visitedInstance,
-                visitedArguments, originalOperation, defaultValue, isLambdaOrLocalFunction: false, CancellationToken.None, out _);
+                visitedArguments, originalOperation, defaultValue, isLambdaOrLocalFunction: false, out _);
+        }
+
+        protected INamedTypeSymbol? TryGetFieldInitializerType(IOperation instance)
+        {
+            if (instance is not IFieldReferenceOperation fieldReference ||
+                !fieldReference.Field.IsReadOnly ||
+                fieldReference.Field.DeclaringSyntaxReferences.Length != 1)
+            {
+                return null;
+            }
+
+            var syntax = fieldReference.Field.DeclaringSyntaxReferences[0].GetSyntax();
+            var semanticModel = WellKnownTypeProvider.Compilation.GetSemanticModel(syntax.SyntaxTree);
+            var initializer = syntax.DescendantNodes()
+                .Select(node => semanticModel.GetOperation(node))
+                .OfType<IFieldInitializerOperation>()
+                .FirstOrDefault();
+            if (initializer == null)
+            {
+                return null;
+            }
+
+            // A readonly field can still be reassigned by a constructor. In that
+            // case its declaration initializer does not identify every receiver.
+            foreach (var syntaxReference in fieldReference.Field.ContainingType.DeclaringSyntaxReferences)
+            {
+                var typeSyntax = syntaxReference.GetSyntax();
+                var typeSemanticModel = WellKnownTypeProvider.Compilation.GetSemanticModel(typeSyntax.SyntaxTree);
+                if (typeSyntax.DescendantNodes()
+                    .Select(node => typeSemanticModel.GetOperation(node))
+                    .OfType<ISimpleAssignmentOperation>()
+                    .Any(assignment => assignment.Target is IFieldReferenceOperation target &&
+                        SymbolEqualityComparer.Default.Equals(target.Field, fieldReference.Field)))
+                {
+                    return null;
+                }
+            }
+
+            IOperation value = initializer.Value;
+            while (value is IConversionOperation conversion)
+            {
+                value = conversion.Operand;
+            }
+
+            return value is IObjectCreationOperation creation ? creation.Type as INamedTypeSymbol : null;
         }
 
         private ControlFlowGraph? GetInterproceduralControlFlowGraph(IMethodSymbol method)
@@ -3579,7 +3655,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         {
             ControlFlowGraph? getCfg() => DataFlowAnalysisContext.GetLocalFunctionControlFlowGraph(localFunction);
             var value = PerformInterproceduralAnalysis(getCfg, localFunction, instanceReceiver: null, arguments: visitedArguments,
-                originalOperation: originalOperation, defaultValue: defaultValue, isLambdaOrLocalFunction: true, CancellationToken.None, out var wasAnalyzed);
+                originalOperation: originalOperation, defaultValue: defaultValue, isLambdaOrLocalFunction: true, out var wasAnalyzed);
             if (wasAnalyzed)
             {
                 Debug.Assert(_interproceduralResultsBuilder.ContainsKey(originalOperation));
@@ -3597,7 +3673,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
         {
             ControlFlowGraph? getCfg() => DataFlowAnalysisContext.GetAnonymousFunctionControlFlowGraph(lambda);
             var value = PerformInterproceduralAnalysis(getCfg, lambda.Symbol, instanceReceiver: null, arguments: visitedArguments,
-                originalOperation: originalOperation, defaultValue: defaultValue, isLambdaOrLocalFunction: true, CancellationToken.None, out var wasAnalyzed);
+                originalOperation: originalOperation, defaultValue: defaultValue, isLambdaOrLocalFunction: true, out var wasAnalyzed);
             if (wasAnalyzed)
             {
                 Debug.Assert(_interproceduralResultsBuilder.ContainsKey(originalOperation));

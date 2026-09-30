@@ -1253,10 +1253,32 @@ Sinks:
     TaintTypes:
       - SCS0018
     Methods:
+    - Name: CreateDirectory
+      Arguments:
+        - path
+    - Name: CreateSymbolicLink
+      Arguments:
+        - path
+        - pathToTarget
     - Name: Delete
       Arguments:
         - path
+    - Name: EnumerateDirectories
+      Arguments:
+        - path
+    - Name: EnumerateFiles
+      Arguments:
+        - path
+    - Name: EnumerateFileSystemEntries
+      Arguments:
+        - path
+    - Name: GetDirectories
+      Arguments:
+        - path
     - Name: GetFiles
+      Arguments:
+        - path
+    - Name: GetFileSystemEntries
       Arguments:
         - path
     - Name: Move
@@ -1290,6 +1312,10 @@ Sinks:
     - Name: Create
       Arguments:
         - path
+    - Name: CreateSymbolicLink
+      Arguments:
+        - path
+        - pathToTarget
     - Name: CreateText
       Arguments:
         - path
@@ -1301,6 +1327,9 @@ Sinks:
         - sourceFileName
         - destFileName
     - Name: Open
+      Arguments:
+        - path
+    - Name: OpenHandle
       Arguments:
         - path
     - Name: OpenRead
@@ -2297,6 +2326,9 @@ Sinks:
     TaintTypes:
       - SCS0002
     Methods:
+    - Name: SqlQueryRaw
+      Arguments:
+        - sql
     - Name: ExecuteSqlCommand
       Arguments:
         - sql

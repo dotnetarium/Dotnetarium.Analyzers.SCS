@@ -29,6 +29,7 @@ jobs:
       with:
         dotnet-version: |
           8.0.x
+          10.0.x
       
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v2      
@@ -45,6 +46,9 @@ jobs:
     - name: Run Tests
       run: |
         VSTest.console.exe ./DotnetariumSCS.Test/bin/Release/DotnetariumSCS.Test.dll
+
+    - name: Test modern .NET sinks
+      run: dotnet run --project tests/ModernSinkSmoke/ModernSinkSmoke.csproj --configuration Release
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

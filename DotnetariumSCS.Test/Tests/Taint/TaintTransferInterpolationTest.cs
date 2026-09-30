@@ -414,6 +414,8 @@ End Class
         [DataRow("Test.Sink($\"{value:G}\")", new object[] { "string", "object" })]
         // {flag} is safe, ensure we're still tainted
         [DataRow("Test.Sink($\"{flag}{value}\")", new object[] { "string", "object" })]
+        [DataRow("Test.Sink($\"{123}{value}\")", new object[] { "string", "object" })]
+        [DataRow("Test.Sink($\"{value}{123}\")", new object[] { "string", "object" })]
         // concat + interp is still tainted
         [DataRow("Test.Sink(flag + $\"{value}\")", new object[] { "string", "object" })]
         [DataTestMethod]

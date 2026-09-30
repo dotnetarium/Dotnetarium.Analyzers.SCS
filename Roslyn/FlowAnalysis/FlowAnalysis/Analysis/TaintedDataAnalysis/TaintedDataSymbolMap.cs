@@ -40,8 +40,8 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 throw new ArgumentNullException(nameof(taintedDataInfos));
             }
 
-            ImmutableDictionary<ITypeSymbol, TInfo>.Builder concreteInfosBuilder = ImmutableDictionary.CreateBuilder<ITypeSymbol, TInfo>();
-            ImmutableDictionary<ITypeSymbol, TInfo>.Builder interfaceInfosBuilder = ImmutableDictionary.CreateBuilder<ITypeSymbol, TInfo>();
+            ImmutableDictionary<ITypeSymbol, ImmutableArray<TInfo>>.Builder concreteInfosBuilder = ImmutableDictionary.CreateBuilder<ITypeSymbol, ImmutableArray<TInfo>>();
+            ImmutableDictionary<ITypeSymbol, ImmutableArray<TInfo>>.Builder interfaceInfosBuilder = ImmutableDictionary.CreateBuilder<ITypeSymbol, ImmutableArray<TInfo>>();
 
             foreach (TInfo info in taintedDataInfos)
             {
@@ -52,15 +52,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                 if (wellKnownTypeProvider.TryGetOrCreateTypeByMetadataName(info.FullTypeName, out INamedTypeSymbol? namedTypeSymbol))
                 {
-                    if (namedTypeSymbol.TypeKind == TypeKind.Interface)
-                    //if (info.IsInterface)
-                    {
-                        interfaceInfosBuilder[namedTypeSymbol] = info;
-                    }
-                    else
-                    {
-                        concreteInfosBuilder[namedTypeSymbol] = info;
-                    }
+                    var infosBuilder = namedTypeSymbol.TypeKind == TypeKind.Interface ? interfaceInfosBuilder : concreteInfosBuilder;
+                    infosBuilder[namedTypeSymbol] = infosBuilder.TryGetValue(namedTypeSymbol, out var existingInfos)
+                        ? existingInfos.Add(info)
+                        : ImmutableArray.Create(info);
 
                     if (info.RequiresValueContentAnalysis)
                     {
@@ -86,12 +81,12 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         /// <summary>
         /// Mapping for concrete types.
         /// </summary>
-        private ImmutableDictionary<ITypeSymbol, TInfo> ConcreteInfos { get; }
+        private ImmutableDictionary<ITypeSymbol, ImmutableArray<TInfo>> ConcreteInfos { get; }
 
         /// <summary>
         /// Mapping for interface types.
         /// </summary>
-        private ImmutableDictionary<ITypeSymbol, TInfo> InterfaceInfos { get; }
+        private ImmutableDictionary<ITypeSymbol, ImmutableArray<TInfo>> InterfaceInfos { get; }
 
         /// <summary>
         /// Indicates that this mapping is empty, i.e. there are no types referenced by the compilation represented by the <see cref="WellKnownTypeProvider"/>.
@@ -129,14 +124,20 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 if (namedTypeSymbol.TypeKind == TypeKind.Interface
                     && this.InterfaceInfos.TryGetValue(namedTypeSymbol.OriginalDefinition, out var infoForInterfaceSymbol))
                 {
-                    yield return infoForInterfaceSymbol;
+                    foreach (var info in infoForInterfaceSymbol)
+                    {
+                        yield return info;
+                    }
                 }
 
                 foreach (INamedTypeSymbol interfaceSymbol in namedTypeSymbol.AllInterfaces)
                 {
-                    if (this.InterfaceInfos.TryGetValue(interfaceSymbol.OriginalDefinition, out var info))
+                    if (this.InterfaceInfos.TryGetValue(interfaceSymbol.OriginalDefinition, out var infos))
                     {
-                        yield return info;
+                        foreach (var info in infos)
+                        {
+                            yield return info;
+                        }
                     }
                 }
             }
@@ -145,9 +146,12 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             {
                 foreach (INamedTypeSymbol typeSymbol in namedTypeSymbol.GetBaseTypesAndThis())
                 {
-                    if (this.ConcreteInfos.TryGetValue(typeSymbol.OriginalDefinition, out var info))
+                    if (this.ConcreteInfos.TryGetValue(typeSymbol.OriginalDefinition, out var infos))
                     {
-                        yield return info;
+                        foreach (var info in infos)
+                        {
+                            yield return info;
+                        }
                     }
                 }
             }
