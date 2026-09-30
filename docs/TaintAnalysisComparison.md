@@ -73,3 +73,61 @@ regression case when a concrete false negative is identified.
 The legacy analyzer test project targets .NET Framework 4.8. A modern test
 harness would make newer syntax regressions runnable in CI independently of
 that test assembly.
+
+## Engine review and proposed order of work
+
+### 1. Correct confirmed false negatives before importing more flow code
+
+The custom `VisitInterpolatedString` returns an untainted value as soon as **any**
+interpolation has a safe primitive type. A .NET 10 smoke project using the
+branch's analyzer DLL detected `Redirect($"{tainted}")`, but missed both
+`Redirect($"{123}/{tainted}")` and `Redirect($"{tainted}/{123}")`.
+Sanitization must apply to the individual interpolation, and the full string
+must remain tainted if any other part is tainted. Retain the existing tests
+that keep numeric-only formatting untainted. Also replace the `throw new
+Exception` on an unexpected interpolation operation type with a conservative
+taint result; a compiler tree change should not crash the analyzer.
+
+The same smoke project detected a tainted URL passed as a helper's argument,
+but missed a URL saved to a static field before a helper read it, and a URL
+captured by a local function. These are focused regression cases for any
+interprocedural rewrite. The smoke test demonstrates current behavior, not
+that the upstream code is already proven to fix each case.
+
+### 2. Port the upstream interprocedural rewrite selectively
+
+The upstream change is potentially valuable. It tracks callee-reachable
+static members, local-function captures, aliases, and referenced child
+entities when trimming state. Dotnetarium's current implementation skips
+trimming for lambdas/local functions and uses an older reachability test for
+ordinary calls. A port could improve both precision and performance, but it
+changes a shared data-flow contract across multiple analyses. Keep
+Dotnetarium's taint visitor, symbol maps, rule configuration, and diagnostic
+formatting; adapt the shared flow contract around them. Measure detection and
+runtime before and after the port. The reference's four redirect regressions
+were traced to the separate sink-map collision fixed in this PR; rerun them
+against the engine as a gate rather than assuming equivalence.
+
+### 3. Simplify once the behavior is pinned down
+
+- `TaintAnalyzer` loops over `rootOperationsNeedingAnalysis`, but the loop
+  variable is unused and each iteration calls analysis with the same CFG and
+  maps. Verify the operation-block cases, then run the analysis once per block.
+- SARIF path reconstruction filters operations by whether their *syntax text*
+  contains text from an unrelated interprocedural result, and selects the last
+  child result with a sink. Replace this with operation/result identity and an
+  explicit path for each source-to-sink pair. Preserve the existing
+  `AdditionalLocations` contract consumed by the global tool.
+- The taint visitor stores every abstract value because of an old extension
+  method regression, whereas upstream stores only tainted or already tracked
+  values. Keep the regression, benchmark memory and runtime, and remove the
+  extra state only if the result remains correct.
+- Move focused modern-syntax and interprocedural cases to a runnable modern
+  test harness. The current .NET Framework test suite covers many configured
+  sinks and interpolation forms, but cannot serve as the only gate for new
+  compiler operation trees.
+
+**Recommendation:** keep the Dotnetarium engine as the product baseline. Take
+upstream's flow fixes only where a failing case or measured improvement shows
+their value. Fix the confirmed interpolation bug first, then port the
+interprocedural state handling behind source/sink and SARIF regression tests.
