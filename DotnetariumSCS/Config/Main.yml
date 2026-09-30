@@ -108,6 +108,30 @@ TaintEntryPoints:
 
 TaintSources:
 
+  # Razor Pages bind properties separately from handler parameters.
+  - Type: Microsoft.AspNetCore.Mvc.RazorPages.PageModel
+    PropertyAttributes:
+      - Microsoft.AspNetCore.Mvc.BindPropertyAttribute
+
+  # Query and form binding are browser-controlled in every Blazor render mode.
+  # Ordinary [Parameter] properties are passed by components and are not sources.
+  - Type: Microsoft.AspNetCore.Components.ComponentBase
+    # Components in a WebAssembly assembly can also be prerendered on the
+    # server. Limit this source to XSS until server-only sinks can use a
+    # project/render-mode-aware execution context.
+    TaintTypes:
+      - SCS0029
+    RoutedParameters: true
+    PropertyAttributes:
+      - Microsoft.AspNetCore.Components.SupplyParameterFromQueryAttribute
+    ServerPropertyAttributes:
+      - Microsoft.AspNetCore.Components.SupplyParameterFromFormAttribute
+
+  - Type: Microsoft.AspNetCore.Components.MarkupString
+    TaintTypes:
+      - SCS0029
+    PreserveTaintOnConversion: true
+
   - Type: Microsoft.EntityFrameworkCore.DbContext
 
   - Type: Microsoft.AspNetCore.Routing.RouteValueDictionary
@@ -1554,6 +1578,19 @@ Sinks:
         - fileName
 
  # XSS
+
+  # Blazor's string AddContent overload encodes output. Only the markupContent
+  # overload and AddMarkupContent bypass that protection.
+  - Type: Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder
+    TaintTypes:
+      - SCS0029
+    Methods:
+    - Name: AddContent
+      Arguments:
+        - markupContent
+    - Name: AddMarkupContent
+      Arguments:
+        - markupContent
 
 # too many warnings, disable for now
 #  - Type: Microsoft.AspNetCore.Mvc.Controller

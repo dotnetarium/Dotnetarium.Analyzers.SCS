@@ -258,7 +258,7 @@ namespace Dotnetarium.Config
 
                 SourceInfo metadata;
 
-                if (type.Value.source != null && type.Value.source.Methods == null && type.Value.source.Properties == null)
+                if (type.Value.source != null && type.Value.source.Methods == null && type.Value.source.Properties == null && type.Value.source.PropertyAttributes == null && type.Value.source.ServerPropertyAttributes == null && type.Value.source.PreserveTaintOnConversion != true && type.Value.source.RoutedParameters != true)
                 {
                     metadata = new SourceInfo(
                         type.Key,
@@ -282,6 +282,12 @@ namespace Dotnetarium.Config
                         isInterface: isIterface ?? false,
                         taintedProperties: type.Value.source?.Properties?.ToImmutableHashSet(StringComparer.Ordinal)
                             ?? ImmutableHashSet<string>.Empty,
+                        taintedPropertyAttributes: type.Value.source?.PropertyAttributes?.ToImmutableHashSet(StringComparer.Ordinal)
+                            ?? ImmutableHashSet<string>.Empty,
+                        serverBoundPropertyAttributes: type.Value.source?.ServerPropertyAttributes?.ToImmutableHashSet(StringComparer.Ordinal)
+                            ?? ImmutableHashSet<string>.Empty,
+                        preserveTaintOnConversion: type.Value.source?.PreserveTaintOnConversion ?? false,
+                        taintRoutedParameters: type.Value.source?.RoutedParameters ?? false,
                         dependencyFullTypeNames:
                             type.Value.entryPoint?.Dependency?.ToImmutableArray(),
                         taintedArguments: type.Value.entryPoint != null ?

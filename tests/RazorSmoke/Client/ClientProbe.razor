@@ -1,0 +1,8 @@
+@page "/client-probe"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@((MarkupString)(Query ?? ""))
+@((MarkupString)(FormValue ?? ""))
+@code {
+    [SupplyParameterFromQuery] private string? Query { get; set; }
+    [SupplyParameterFromForm] private string? FormValue { get; set; }
+}

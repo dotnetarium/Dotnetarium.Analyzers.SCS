@@ -50,6 +50,10 @@ jobs:
     - name: Test modern .NET sinks
       run: dotnet run --project tests/ModernSinkSmoke/ModernSinkSmoke.csproj --configuration Release
 
+    - name: Test Razor and Blazor taint flows
+      shell: pwsh
+      run: ./tests/RazorSmoke/Test.ps1
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:

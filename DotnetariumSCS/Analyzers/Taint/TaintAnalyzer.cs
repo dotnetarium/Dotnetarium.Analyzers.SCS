@@ -125,11 +125,24 @@ namespace Dotnetarium.Analyzers.Taint
 
         protected override SinkKind SinkKind { get { return (SinkKind)(int)TaintType.SCS0029; } }
 
+        protected override bool AnalyzeRazorGeneratedCode => true;
+
         protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor { get { return Rule; } }
     }
 
     public abstract class TaintAnalyzer : DiagnosticAnalyzer
     {
+        protected virtual bool AnalyzeRazorGeneratedCode => false;
+
+        private static bool IsOtherGeneratedCode(string path)
+        {
+            return !string.IsNullOrEmpty(path)
+                && (path.EndsWith(".g.cs", System.StringComparison.OrdinalIgnoreCase)
+                    || path.EndsWith(".g.vb", System.StringComparison.OrdinalIgnoreCase))
+                && !path.EndsWith("_razor.g.cs", System.StringComparison.OrdinalIgnoreCase)
+                && !path.EndsWith("_cshtml.g.cs", System.StringComparison.OrdinalIgnoreCase);
+        }
+
         protected abstract DiagnosticDescriptor TaintedDataEnteringSinkDescriptor { get; }
 
         protected abstract SinkKind SinkKind { get; }
@@ -145,7 +158,7 @@ namespace Dotnetarium.Analyzers.Taint
             if (!Debugger.IsAttached) // prefer single thread for debugging in development
                 context.EnableConcurrentExecution();
 
-            if (context.IsAuditMode())
+            if (context.IsAuditMode() || AnalyzeRazorGeneratedCode)
                 context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
             else
                 context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -302,6 +315,13 @@ namespace Dotnetarium.Analyzers.Taint
                         compilationContext.RegisterOperationBlockStartAction(
                             operationBlockStartContext =>
                             {
+                                if (AnalyzeRazorGeneratedCode
+                                    && operationBlockStartContext.OperationBlocks.All(block =>
+                                        IsOtherGeneratedCode(block.Syntax.SyntaxTree.FilePath)))
+                                {
+                                    return;
+                                }
+
                                 ISymbol owningSymbol = operationBlockStartContext.OwningSymbol;
                                 AnalyzerOptions options = operationBlockStartContext.Options;
                                 CancellationToken cancellationToken = operationBlockStartContext.CancellationToken;

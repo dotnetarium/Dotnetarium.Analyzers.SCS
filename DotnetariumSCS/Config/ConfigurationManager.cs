@@ -458,6 +458,14 @@ namespace Dotnetarium.Config
 
         public string[] Properties { get; set; }
 
+        public string[] PropertyAttributes { get; set; }
+
+        public string[] ServerPropertyAttributes { get; set; }
+
+        public bool? PreserveTaintOnConversion { get; set; }
+
+        public bool? RoutedParameters { get; set; }
+
         public string[] Methods { get; set; }
     }
 
