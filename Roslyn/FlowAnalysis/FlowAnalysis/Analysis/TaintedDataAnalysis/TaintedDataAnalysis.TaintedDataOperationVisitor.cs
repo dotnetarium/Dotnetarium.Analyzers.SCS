@@ -362,13 +362,30 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 }
                 else
                 {
+                    using var inputAnalysisData = GetClonedCurrentAnalysisData();
+                    TaintedDataAnalysisData? mergedAnalysisData = null;
                     foreach (var target in targets)
                     {
+                        CurrentAnalysisData = GetClonedAnalysisData(inputAnalysisData);
                         var targetResult = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
                             target, visitedInstance, visitedArguments, invokedAsDelegate, originalOperation, defaultValue);
                         ProcessTaintedDataEnteringInvocationOrCreation(target, visitedArguments, taintedArguments, originalOperation);
                         result = ValueDomain.Merge(result, targetResult);
+
+                        if (mergedAnalysisData == null)
+                        {
+                            mergedAnalysisData = CurrentAnalysisData;
+                        }
+                        else
+                        {
+                            var merged = MergeAnalysisData(mergedAnalysisData, CurrentAnalysisData);
+                            mergedAnalysisData.Dispose();
+                            CurrentAnalysisData.Dispose();
+                            mergedAnalysisData = merged;
+                        }
                     }
+
+                    CurrentAnalysisData = mergedAnalysisData!;
                 }
 
                 ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);

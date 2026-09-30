@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -54,7 +54,7 @@ class SafeRedirector : IRedirector
 {
     public void Go(string url) { }
 }
-static class Holder { public static HttpResponse Response; }
+static class Holder { public static HttpResponse Response = null; }
 class Caller
 {
     public void Run(string url)
@@ -87,7 +87,7 @@ class SafeRedirector : IRedirector
 {
     public void Go(string url) { }
 }
-static class Holder { public static HttpResponse Response; }
+static class Holder { public static HttpResponse Response = null; }
 class Caller
 {
     public void Run(string url)
@@ -120,7 +120,7 @@ class SafeRedirector : IRedirector
 {
     public void Go(string url) { }
 }
-static class Holder { public static HttpResponse Response; }
+static class Holder { public static HttpResponse Response = null; }
 class Caller
 {
     private readonly IRedirector redirector = new SafeRedirector();
@@ -142,11 +142,21 @@ TaintEntryPoints:
 using System.Web;
 
 interface IRedirector { void Go(string url); }
+interface IServices { }
+static class ServiceRegistrations
+{
+    public static void AddScoped<TService, TImplementation>(this IServices services)
+        where TImplementation : TService { }
+    public static void Configure(IServices services)
+    {
+        services.AddScoped<IRedirector, UnsafeRedirector>();
+    }
+}
 class UnsafeRedirector : IRedirector
 {
     public void Go(string url) { Holder.Response.Redirect(url); }
 }
-static class Holder { public static HttpResponse Response; }
+static class Holder { public static HttpResponse Response = null; }
 class Caller
 {
     private readonly IRedirector redirector;
@@ -160,6 +170,82 @@ TaintEntryPoints:
       Name: Run
 ");
             await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task DoesNotWarnForUnknownReceiverWithOnlySafeImplementation()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class SafeRedirector : IRedirector
+{
+    public void Go(string url) { }
+}
+class Caller
+{
+    private readonly IRedirector redirector;
+    public Caller(IRedirector redirector) { this.redirector = redirector; }
+    public void Run(HttpRequest request) { redirector.Go(request.Form[""url""]); }
+}";
+            await VerifyCSharpDiagnostic(code).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task FollowsConcreteImplementationPassedToInterfaceConstructor()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+static class Holder { public static HttpResponse Response = null; }
+class Controller
+{
+    private readonly IRedirector redirector;
+    public Controller(IRedirector redirector) { this.redirector = redirector; }
+    public void Check(string url) { redirector.Go(url); }
+}
+class Entry
+{
+    public void Run(HttpRequest request)
+    {
+        var controller = new Controller(new UnsafeRedirector());
+        controller.Check(request.Form[""url""]);
+    }
+}";
+            await VerifyCSharpDiagnostic(code, Expected).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task WarnsWhenOneOfTwoPossibleImplementationsIsUnsafe()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+class SafeRedirector : IRedirector
+{
+    public void Go(string url) { }
+}
+static class Holder { public static HttpResponse Response = null; }
+class Caller
+{
+    public void Run(HttpRequest request, bool safe)
+    {
+        IRedirector redirector = safe ? (IRedirector)new SafeRedirector() : new UnsafeRedirector();
+        redirector.Go(request.Form[""url""]);
+    }
+}";
+            await VerifyCSharpDiagnostic(code, Expected).ConfigureAwait(false);
         }
 
         [TestMethod]
@@ -201,7 +287,7 @@ class SafeRedirector : IRedirector
 {
     public void Go(string url) { }
 }
-static class Holder { public static HttpResponse Response; }
+static class Holder { public static HttpResponse Response = null; }
 class Caller
 {
     private IRedirector redirector = new SafeRedirector();

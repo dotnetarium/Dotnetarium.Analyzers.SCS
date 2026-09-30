@@ -175,7 +175,7 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 Debug.Assert(!_currentAnalysisData.IsDisposed);
                 return _currentAnalysisData;
             }
-            private set
+            set
             {
                 Debug.Assert(!value.IsDisposed);
                 _currentAnalysisData = value;
