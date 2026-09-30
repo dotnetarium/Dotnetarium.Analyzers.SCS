@@ -125,8 +125,7 @@ End Namespace
                         {
                             new ResultAdditionalLocation(19, 25),
                             new ResultAdditionalLocation(21, 13),
-                            new ResultAdditionalLocation(27, 23),
-                            new ResultAdditionalLocation(28, 13),
+                            new ResultAdditionalLocation(27, 52),
                         })
                 };
 
@@ -138,8 +137,7 @@ End Namespace
                         {
                             new ResultAdditionalLocation(20, 24),
                             new ResultAdditionalLocation(21, 13),
-                            new ResultAdditionalLocation(26, 17),
-                            new ResultAdditionalLocation(27, 13),
+                            new ResultAdditionalLocation(26, 59),
                         })
                 };
 
@@ -239,8 +237,7 @@ End Namespace
                         {
                             new ResultAdditionalLocation(19, 25),
                             new ResultAdditionalLocation(23, 13),
-                            new ResultAdditionalLocation(29, 23),
-                            new ResultAdditionalLocation(30, 13),
+                            new ResultAdditionalLocation(29, 52),
                         })
                 };
 
@@ -252,8 +249,7 @@ End Namespace
                         {
                             new ResultAdditionalLocation(20, 24),
                             new ResultAdditionalLocation(23, 13),
-                            new ResultAdditionalLocation(28, 17),
-                            new ResultAdditionalLocation(29, 13),
+                            new ResultAdditionalLocation(28, 59),
                         })
                 };
 
