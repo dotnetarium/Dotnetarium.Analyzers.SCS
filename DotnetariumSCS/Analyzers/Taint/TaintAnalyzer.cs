@@ -473,8 +473,6 @@ namespace Dotnetarium.Analyzers.Taint
                                                     return;
                                                 }
 
-                                                foreach (IOperation rootOperation in rootOperationsNeedingAnalysis)
-                                                {
                                                     TaintedDataAnalysisResult? taintedDataAnalysisResult = TaintedDataAnalysis.TryGetOrComputeResult(
                                                         controlFlowGraphFactory.Value,
                                                         operationBlockAnalysisContext.Compilation,
@@ -594,7 +592,6 @@ namespace Dotnetarium.Analyzers.Taint
                                                             }
                                                         }                                                        
                                                     }
-                                                }
                                             }
                                         }
                                         finally
