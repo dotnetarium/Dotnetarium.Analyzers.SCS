@@ -3593,6 +3593,22 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                 return null;
             }
 
+            // A readonly field can still be reassigned by a constructor. In that
+            // case its declaration initializer does not identify every receiver.
+            foreach (var syntaxReference in fieldReference.Field.ContainingType.DeclaringSyntaxReferences)
+            {
+                var typeSyntax = syntaxReference.GetSyntax();
+                var typeSemanticModel = WellKnownTypeProvider.Compilation.GetSemanticModel(typeSyntax.SyntaxTree);
+                if (typeSyntax.DescendantNodes()
+                    .Select(node => typeSemanticModel.GetOperation(node))
+                    .OfType<ISimpleAssignmentOperation>()
+                    .Any(assignment => assignment.Target is IFieldReferenceOperation target &&
+                        SymbolEqualityComparer.Default.Equals(target.Field, fieldReference.Field)))
+                {
+                    return null;
+                }
+            }
+
             IOperation value = initializer.Value;
             while (value is IConversionOperation conversion)
             {

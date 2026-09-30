@@ -160,6 +160,30 @@ TaintEntryPoints:
             await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
         }
 
+        [TestMethod]
+        public async Task ConstructorAssignmentOverridesReadonlyFieldInitializer()
+        {
+            var code = @"
+using System.Web;
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector { public void Go(string url) { Holder.Response.Redirect(url); } }
+class SafeRedirector : IRedirector { public void Go(string url) { } }
+static class Holder { public static HttpResponse Response = null; }
+class Caller
+{
+    private readonly IRedirector redirector = new SafeRedirector();
+    public Caller() { redirector = new UnsafeRedirector(); }
+    public void Run(string url) { redirector.Go(url); }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  Caller:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+        }
+
         [DataRow("services.AddScoped<IRedirector, UnsafeRedirector>(); services.AddScoped<IRedirector, SafeRedirector>();", false)]
         [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.AddScoped<IRedirector, UnsafeRedirector>();", true)]
         [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.TryAddScoped<IRedirector, UnsafeRedirector>();", false)]
