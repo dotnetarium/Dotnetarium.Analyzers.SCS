@@ -507,6 +507,9 @@ namespace Dotnetarium.Analyzers.Taint
                                                                 this.TaintedDataEnteringSinkDescriptor,
                                                                 sourceSink.Sink.Location,
                                                                 additionalLocations: additionalLocations,
+                                                                properties: config.TaintFlowVisualizationEnabled
+                                                                    ? ImmutableDictionary<string, string>.Empty.Add("dotnetarium.flow", "true")
+                                                                    : null,
                                                                 messageArgs: new object[] {
                                                                     sourceSink.Sink.Symbol.Name,
                                                                     sourceSink.Sink.AccessingMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),

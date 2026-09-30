@@ -112,11 +112,14 @@ regressions were traced to the separate sink-map collision fixed in this PR.
 - `TaintAnalyzer` previously looped over `rootOperationsNeedingAnalysis` while
   ignoring the loop variable and analyzing the same CFG each time. The branch
   now runs that analysis once per operation block.
-- SARIF path reconstruction filters operations by whether their *syntax text*
-  contains text from an unrelated interprocedural result, and selects the last
-  child result with a sink. Replace this with operation/result identity and an
-  explicit path for each source-to-sink pair. Preserve the existing
-  `AdditionalLocations` contract consumed by the global tool.
+- Flow witnesses now come from `TaintedDataAnalysisResult` for each source and
+  sink pair. They follow interprocedural results that contain that finding,
+  using call-operation identity. The analyzer no longer filters by syntax text
+  or selects the last child with any sink. The witness includes the source,
+  matching call sites, and the sink. Intra-method assignments are omitted until
+  they can be linked to the sink without inventing a path. The analyzer keeps
+  `AdditionalLocations` and marks complete witnesses for the global tool to
+  emit as SARIF `codeFlows` alongside `relatedLocations`.
 - The taint visitor stores every abstract value because of an old extension
   method regression, whereas upstream stores only tainted or already tracked
   values. Keep the regression, benchmark memory and runtime, and remove the
