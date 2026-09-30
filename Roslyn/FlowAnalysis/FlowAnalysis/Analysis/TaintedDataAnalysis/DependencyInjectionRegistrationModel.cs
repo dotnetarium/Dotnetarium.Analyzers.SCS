@@ -20,6 +20,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
         private readonly Dictionary<ITypeSymbol, List<Registration>> _registrations =
             new Dictionary<ITypeSymbol, List<Registration>>(SymbolEqualityComparer.Default);
+        private readonly HashSet<string> _opaqueSites = new HashSet<string>();
 
         private DependencyInjectionRegistrationModel(Compilation compilation)
         {
@@ -33,26 +34,32 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 var semanticModel = compilation.GetSemanticModel(tree);
                 foreach (var syntax in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
                 {
-                    if (semanticModel.GetOperation(syntax) is not IInvocationOperation invocation ||
-                        !IsRegistrationMethod(invocation.TargetMethod))
+                    if (semanticModel.GetOperation(syntax) is not IInvocationOperation invocation)
                     {
+                        continue;
+                    }
+
+                    var receiver = invocation.Instance ?? invocation.Arguments.FirstOrDefault()?.Value;
+                    if (receiver?.Type?.ToDisplayString() != "Microsoft.Extensions.DependencyInjection.IServiceCollection")
+                    {
+                        continue;
+                    }
+
+                    var site = semanticModel.GetEnclosingSymbol(syntax.SpanStart)?.ToDisplayString() + ":" + receiver.Syntax;
+                    if (!IsRegistrationMethod(invocation.TargetMethod))
+                    {
+                        _opaqueSites.Add(site);
                         continue;
                     }
 
                     var serviceType = GetServiceType(invocation);
                     if (serviceType == null)
                     {
-                        continue;
-                    }
-
-                    var receiver = invocation.Instance ?? invocation.Arguments.FirstOrDefault()?.Value;
-                    if (receiver == null)
-                    {
+                        _opaqueSites.Add(site);
                         continue;
                     }
 
                     // A composed or conditional collection has runtime-dependent order.
-                    var site = semanticModel.GetEnclosingSymbol(syntax.SpanStart)?.ToDisplayString() + ":" + receiver.Syntax;
                     var conditional = syntax.Ancestors().Any(node =>
                         node is IfStatementSyntax || node is SwitchStatementSyntax ||
                         node is ConditionalExpressionSyntax || node is ForStatementSyntax ||
@@ -79,6 +86,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             implementations = ImmutableArray<INamedTypeSymbol>.Empty;
             if (!_registrations.TryGetValue(serviceType, out var registrations) ||
                 registrations.Select(registration => registration.Site).Distinct().Count() != 1 ||
+                _opaqueSites.Contains(registrations[0].Site) ||
                 registrations.Any(registration => registration.Conditional))
             {
                 return false;
@@ -107,8 +115,16 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
         private static bool IsRegistrationMethod(IMethodSymbol method)
         {
-            if (!method.IsExtensionMethod ||
-                !method.ContainingNamespace.ToDisplayString().StartsWith("Microsoft.Extensions.DependencyInjection", StringComparison.Ordinal))
+            if (!method.IsExtensionMethod)
+            {
+                return false;
+            }
+
+            var declaringType = method.ContainingType.ToDisplayString();
+            var isTryAdd = method.Name.StartsWith("TryAdd", StringComparison.Ordinal);
+            if (declaringType != (isTryAdd
+                    ? "Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions"
+                    : "Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions"))
             {
                 return false;
             }

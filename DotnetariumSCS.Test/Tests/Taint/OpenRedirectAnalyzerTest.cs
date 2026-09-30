@@ -173,6 +173,7 @@ TaintEntryPoints:
 using System;
 using System.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Microsoft.Extensions.DependencyInjection
 {{
     public interface IServiceCollection {{ }}
@@ -180,9 +181,15 @@ namespace Microsoft.Extensions.DependencyInjection
     {{
         public static IServiceCollection AddScoped<TService, TImplementation>(this IServiceCollection services)
             where TImplementation : TService => services;
+        public static IServiceCollection AddScoped<TService>(this IServiceCollection services, Func<object, TService> factory) => services;
+    }}
+}}
+namespace Microsoft.Extensions.DependencyInjection.Extensions
+{{
+    public static class ServiceCollectionDescriptorExtensions
+    {{
         public static IServiceCollection TryAddScoped<TService, TImplementation>(this IServiceCollection services)
             where TImplementation : TService => services;
-        public static IServiceCollection AddScoped<TService>(this IServiceCollection services, Func<object, TService> factory) => services;
     }}
 }}
 interface IRedirector {{ void Go(string url); }}
@@ -202,7 +209,14 @@ TaintEntryPoints:
     Method:
       Name: Run
 ");
-            await VerifyCSharpDiagnostic(code, warn ? Expected : null, config).ConfigureAwait(false);
+            if (warn)
+            {
+                await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+            }
+            else
+            {
+                await VerifyCSharpDiagnostic(code, null, config).ConfigureAwait(false);
+            }
         }
 
         [TestMethod]
