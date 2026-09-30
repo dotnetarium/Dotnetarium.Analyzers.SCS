@@ -39,6 +39,50 @@ namespace DotnetariumSCS.Test.Taint
 
         protected override IEnumerable<MetadataReference> GetAdditionalReferences() => References;
 
+        [TestMethod]
+        public async Task DetectsTaintInStaticFieldReadByHelper()
+        {
+            var code = @"
+using System.Web;
+
+public class StaticRedirect
+{
+    private static string saved;
+
+    public void Run(HttpRequest request, HttpResponse response)
+    {
+        saved = request.Form[""url""];
+        Use(response);
+    }
+
+    private static void Use(HttpResponse response)
+    {
+        response.Redirect(saved);
+    }
+}";
+
+            await VerifyCSharpDiagnostic(code, Expected).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task DetectsTaintCapturedByLocalFunction()
+        {
+            var code = @"
+using System.Web;
+
+public class CapturedRedirect
+{
+    public void Run(HttpRequest request, HttpResponse response)
+    {
+        string saved = request.Form[""url""];
+        void Use() => response.Redirect(saved);
+        Use();
+    }
+}";
+
+            await VerifyCSharpDiagnostic(code, Expected).ConfigureAwait(false);
+        }
+
         [TestCategory("Detect")]
         [DataRow("System.Web",                "Response.Redirect(input)")]
         [DataRow("System.Web",                "Response.Redirect(input, true)")]

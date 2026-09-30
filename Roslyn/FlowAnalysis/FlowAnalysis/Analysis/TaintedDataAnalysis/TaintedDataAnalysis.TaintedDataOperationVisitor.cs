@@ -328,7 +328,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             {
                 TaintedDataAbstractValue baseValue = base.VisitObjectCreation(operation, argument);
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(operation.Arguments);
-                if (taintedArguments.Any())
+                if (operation.Constructor != null)
                 {
                     ProcessTaintedDataEnteringInvocationOrCreation(operation.Constructor, operation.Arguments, taintedArguments, operation);
                 }
@@ -354,10 +354,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                     defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                if (taintedArguments.Any())
-                {
-                    ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);
-                }
+                ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);
 
                 PooledHashSet<string>? taintedTargets = null;
                 PooledHashSet<(string, string)>? taintedParameterPairs = null;
@@ -506,10 +503,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 TaintedDataAbstractValue baseValue = base.VisitInvocation_LocalFunction(localFunction, visitedArguments, originalOperation, defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                if (taintedArguments.Any())
-                {
-                    ProcessTaintedDataEnteringInvocationOrCreation(localFunction, visitedArguments, taintedArguments, originalOperation);
-                }
+                ProcessTaintedDataEnteringInvocationOrCreation(localFunction, visitedArguments, taintedArguments, originalOperation);
 
                 return baseValue;
             }
@@ -520,10 +514,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 TaintedDataAbstractValue baseValue = base.VisitInvocation_Lambda(lambda, visitedArguments, originalOperation, defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                if (taintedArguments.Any())
-                {
-                    ProcessTaintedDataEnteringInvocationOrCreation(lambda.Symbol, visitedArguments, taintedArguments, originalOperation);
-                }
+                ProcessTaintedDataEnteringInvocationOrCreation(lambda.Symbol, visitedArguments, taintedArguments, originalOperation);
 
                 return baseValue;
             }
@@ -635,7 +626,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             }
 
             /// <summary>
-            /// Determines if tainted data is entering a sink as a method call or constructor argument, and if so, flags it.
+            /// Flags tainted arguments entering a sink and merges sinks found inside the callee.
+            /// The callee must be checked even without tainted arguments: it can read tainted
+            /// static state or capture a tainted local variable.
             /// </summary>
             /// <param name="targetMethod">Method being invoked.</param>
             /// <param name="taintedArguments">Arguments with tainted data to the method.</param>

@@ -47,13 +47,14 @@ definition per type. This PR retains all definitions for a type. For example,
 one must not overwrite the other. The change keeps Dotnetarium's interface
 lookup and field-source flag, and adds a test for both insertion orders.
 
-No upstream interprocedural visitor has been copied into the analyzer engine
-on this branch. The updated reference includes a state-trimming rewrite spread
-across `AnalysisEntityDataFlowOperationVisitor`, `DataFlowOperationVisitor`, and
-four concrete analysis visitors. That is a coupled flow-semantic change. It
-should be ported selectively with Dotnetarium source/sink, sanitizer, flow-path,
-and performance regressions in place, including the redirect cases that failed
-during the local reference integration.
+The branch now ports the upstream state-trimming rewrite across
+`AnalysisEntityDataFlowOperationVisitor`, `DataFlowOperationVisitor`, and four
+concrete analysis visitors. It keeps Dotnetarium's taint visitor and rule
+configuration. The port uses `Children` for Roslyn 3.11 compatibility and
+retains the analyzer's existing skip-analysis option API. The interpolation
+visitor is separately fixed so a safe numeric part cannot clear taint from
+another part of the same string. The operation-block analyzer now executes
+the same CFG once rather than once per recorded root.
 
 ## Modern language features
 
@@ -76,43 +77,42 @@ that test assembly.
 
 ## Engine review and proposed order of work
 
-### 1. Correct confirmed false negatives before importing more flow code
+### 1. Correct confirmed false negatives
 
-The custom `VisitInterpolatedString` returns an untainted value as soon as **any**
-interpolation has a safe primitive type. A .NET 10 smoke project using the
-branch's analyzer DLL detected `Redirect($"{tainted}")`, but missed both
+Previously, the custom `VisitInterpolatedString` returned an untainted value
+as soon as **any** interpolation had a safe primitive type. A .NET 10 smoke
+project detected `Redirect($"{tainted}")`, but missed both
 `Redirect($"{123}/{tainted}")` and `Redirect($"{tainted}/{123}")`.
-Sanitization must apply to the individual interpolation, and the full string
-must remain tainted if any other part is tainted. Retain the existing tests
-that keep numeric-only formatting untainted. Also replace the `throw new
-Exception` on an unexpected interpolation operation type with a conservative
-taint result; a compiler tree change should not crash the analyzer.
+The fix sanitizes each interpolated part individually and keeps the full
+string tainted when another part is tainted. It also removes a throw on an
+unexpected interpolation operation type. Existing numeric-only cases and new
+mixed-string cases are covered by the legacy test suite.
 
-The same smoke project detected a tainted URL passed as a helper's argument,
-but missed a URL saved to a static field before a helper read it, and a URL
-captured by a local function. These are focused regression cases for any
-interprocedural rewrite. The smoke test demonstrates current behavior, not
-that the upstream code is already proven to fix each case.
+The same smoke project initially detected a tainted URL passed as a helper's
+argument, but missed a URL saved to a static field before a helper read it,
+and a URL captured by a local function. The taint visitor discarded callee
+sink findings whenever the call itself had no tainted argument. It now merges
+callee findings regardless of argument taint. Both cases are detected, and
+they have focused regression tests in `OpenRedirectAnalyzerTest`.
 
-### 2. Port the upstream interprocedural rewrite selectively
+### 2. Evaluate the shared upstream interprocedural port
 
-The upstream change is potentially valuable. It tracks callee-reachable
-static members, local-function captures, aliases, and referenced child
-entities when trimming state. Dotnetarium's current implementation skips
-trimming for lambdas/local functions and uses an older reachability test for
-ordinary calls. A port could improve both precision and performance, but it
-changes a shared data-flow contract across multiple analyses. Keep
-Dotnetarium's taint visitor, symbol maps, rule configuration, and diagnostic
-formatting; adapt the shared flow contract around them. Measure detection and
-runtime before and after the port. The reference's four redirect regressions
-were traced to the separate sink-map collision fixed in this PR; rerun them
-against the engine as a gate rather than assuming equivalence.
+The upstream change tracks callee-reachable static members, local-function
+captures, aliases, and referenced child entities when trimming state. A
+controlled comparison showed why this selective port belongs in the engine:
+with the taint visitor fix but the old shared flow files, the captured-local
+case was detected while the static-field helper case remained undetected;
+with the upstream flow files restored, both were detected. The full Windows
+suite also passed with the port before the taint visitor fix. The final
+combination still needs its own CI pass and runtime measurements before this
+draft PR is ready to merge. The reference's four redirect regressions were
+traced to the separate sink-map collision fixed in this PR.
 
 ### 3. Simplify once the behavior is pinned down
 
-- `TaintAnalyzer` loops over `rootOperationsNeedingAnalysis`, but the loop
-  variable is unused and each iteration calls analysis with the same CFG and
-  maps. Verify the operation-block cases, then run the analysis once per block.
+- `TaintAnalyzer` previously looped over `rootOperationsNeedingAnalysis` while
+  ignoring the loop variable and analyzing the same CFG each time. The branch
+  now runs that analysis once per operation block.
 - SARIF path reconstruction filters operations by whether their *syntax text*
   contains text from an unrelated interprocedural result, and selects the last
   child result with a sink. Replace this with operation/result identity and an
@@ -127,7 +127,7 @@ against the engine as a gate rather than assuming equivalence.
   sinks and interpolation forms, but cannot serve as the only gate for new
   compiler operation trees.
 
-**Recommendation:** keep the Dotnetarium engine as the product baseline. Take
-upstream's flow fixes only where a failing case or measured improvement shows
-their value. Fix the confirmed interpolation bug first, then port the
-interprocedural state handling behind source/sink and SARIF regression tests.
+**Recommendation:** keep the Dotnetarium engine as the product baseline. The
+interpolation, sink-map, and callee-result fixes close confirmed detection
+gaps. Keep the selective upstream flow port because it is also needed for the
+static-field case, while preserving the Dotnetarium taint rules and reporting.
