@@ -24,6 +24,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         private sealed class TaintedDataOperationVisitor : AnalysisEntityDataFlowOperationVisitor<TaintedDataAnalysisData, TaintedDataAnalysisContext, TaintedDataAnalysisResult, TaintedDataAbstractValue>
         {
             private readonly TaintedDataAnalysisDomain _taintedDataAnalysisDomain;
+            private readonly Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>> _interfaceTargets = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>();
 
             /// <summary>
             /// Mapping of a tainted data sinks to their originating sources.
@@ -351,16 +352,25 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 IOperation originalOperation,
                 TaintedDataAbstractValue defaultValue)
             {
-                // Always invoke base visit.
-                TaintedDataAbstractValue result = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
-                    method,
-                    visitedInstance,
-                    visitedArguments,
-                    invokedAsDelegate,
-                    originalOperation,
-                    defaultValue);
-
+                var targets = GetInterfaceTargets(method, visitedInstance);
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
+                TaintedDataAbstractValue result = defaultValue;
+                if (targets.IsDefaultOrEmpty)
+                {
+                    result = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
+                        method, visitedInstance, visitedArguments, invokedAsDelegate, originalOperation, defaultValue);
+                }
+                else
+                {
+                    foreach (var target in targets)
+                    {
+                        var targetResult = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
+                            target, visitedInstance, visitedArguments, invokedAsDelegate, originalOperation, defaultValue);
+                        ProcessTaintedDataEnteringInvocationOrCreation(target, visitedArguments, taintedArguments, originalOperation);
+                        result = ValueDomain.Merge(result, targetResult);
+                    }
+                }
+
                 ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);
 
                 PooledHashSet<string>? taintedTargets = null;
@@ -502,6 +512,84 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 }
 
                 return result;
+            }
+
+            private ImmutableArray<IMethodSymbol> GetInterfaceTargets(IMethodSymbol method, IOperation? instance)
+            {
+                if (instance == null || method.ContainingType.TypeKind != TypeKind.Interface)
+                {
+                    return ImmutableArray<IMethodSymbol>.Empty;
+                }
+
+                var receiver = GetPointsToAbstractValue(instance);
+                if (receiver.Kind == PointsToAbstractValueKind.KnownLocations)
+                {
+                    var knownTypes = receiver.Locations
+                        .Select(location => location.LocationType)
+                        .OfType<INamedTypeSymbol>()
+                        .Where(type => type.TypeKind == TypeKind.Class || type.TypeKind == TypeKind.Struct)
+                        .Distinct();
+                    var targets = knownTypes
+                        .Select(type => type.FindImplementationForInterfaceMember(method))
+                        .OfType<IMethodSymbol>()
+                        .Where(target => target.Locations.Any(location => location.IsInSource))
+                        .ToImmutableArray();
+                    if (targets.Length != 0)
+                    {
+                        return targets;
+                    }
+                }
+
+                if (TryGetFieldInitializerType(instance) is INamedTypeSymbol initializedType &&
+                    initializedType.FindImplementationForInterfaceMember(method) is IMethodSymbol initializedTarget &&
+                    initializedTarget.Locations.Any(location => location.IsInSource))
+                {
+                    return ImmutableArray.Create(initializedTarget);
+                }
+
+                // For a receiver supplied outside this method (for example, constructor
+                // injection), the implementation is unknown. Analyze every implementation
+                // visible in this compilation as a possible target.
+                if (_interfaceTargets.TryGetValue(method, out var cachedTargets))
+                {
+                    return cachedTargets;
+                }
+
+                var builder = ImmutableArray.CreateBuilder<IMethodSymbol>();
+                AddImplementations(WellKnownTypeProvider.Compilation.GlobalNamespace);
+                var possibleTargets = builder.Distinct().ToImmutableArray();
+                _interfaceTargets.Add(method, possibleTargets);
+                return possibleTargets;
+
+                void AddImplementations(INamespaceSymbol namespaceSymbol)
+                {
+                    foreach (var type in namespaceSymbol.GetTypeMembers())
+                    {
+                        AddTypeImplementations(type);
+                    }
+
+                    foreach (var child in namespaceSymbol.GetNamespaceMembers())
+                    {
+                        AddImplementations(child);
+                    }
+                }
+
+                void AddTypeImplementations(INamedTypeSymbol type)
+                {
+                    if (!type.IsAbstract && type.AllInterfaces.Contains(method.ContainingType))
+                    {
+                        if (type.FindImplementationForInterfaceMember(method) is IMethodSymbol target &&
+                            target.Locations.Any(location => location.IsInSource))
+                        {
+                            builder.Add(target);
+                        }
+                    }
+
+                    foreach (var nestedType in type.GetTypeMembers())
+                    {
+                        AddTypeImplementations(nestedType);
+                    }
+                }
             }
 
             public override TaintedDataAbstractValue VisitInvocation_LocalFunction(IMethodSymbol localFunction, ImmutableArray<IArgumentOperation> visitedArguments, IOperation originalOperation, TaintedDataAbstractValue defaultValue)

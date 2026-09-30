@@ -40,6 +40,187 @@ namespace DotnetariumSCS.Test.Taint
         protected override IEnumerable<MetadataReference> GetAdditionalReferences() => References;
 
         [TestMethod]
+        public async Task FollowsInterfaceCallToKnownImplementation()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+class SafeRedirector : IRedirector
+{
+    public void Go(string url) { }
+}
+static class Holder { public static HttpResponse Response; }
+class Caller
+{
+    public void Run(string url)
+    {
+        IRedirector redirector = new UnsafeRedirector();
+        redirector.Go(url);
+    }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  OpenRedirect:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task DoesNotFollowOtherImplementationForKnownSafeReceiver()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+class SafeRedirector : IRedirector
+{
+    public void Go(string url) { }
+}
+static class Holder { public static HttpResponse Response; }
+class Caller
+{
+    public void Run(string url)
+    {
+        IRedirector redirector = new SafeRedirector();
+        redirector.Go(url);
+    }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  OpenRedirect:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, null, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task DoesNotFollowOtherImplementationForSafeFieldInitializer()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+class SafeRedirector : IRedirector
+{
+    public void Go(string url) { }
+}
+static class Holder { public static HttpResponse Response; }
+class Caller
+{
+    private readonly IRedirector redirector = new SafeRedirector();
+    public void Run(string url) { redirector.Go(url); }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  OpenRedirect:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, null, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task FollowsInterfaceCallForUnknownInjectedReceiver()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+static class Holder { public static HttpResponse Response; }
+class Caller
+{
+    private readonly IRedirector redirector;
+    public Caller(IRedirector redirector) { this.redirector = redirector; }
+    public void Run(string url) { redirector.Go(url); }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  OpenRedirect:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task FollowsConstructorStateThroughInterfaceCall()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(HttpResponse response); }
+class Redirector : IRedirector
+{
+    private readonly string url;
+    public Redirector(string url) { this.url = url; }
+    public void Go(HttpResponse response) { response.Redirect(url); }
+}
+class Caller
+{
+    public void Run(HttpRequest request, HttpResponse response)
+    {
+        IRedirector redirector = new Redirector(request.Form[""url""]);
+        redirector.Go(response);
+    }
+}";
+            await VerifyCSharpDiagnostic(code, Expected).ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task FollowsReassignedImplementationInsteadOfFieldInitializer()
+        {
+            var code = @"
+using System.Web;
+
+interface IRedirector { void Go(string url); }
+class UnsafeRedirector : IRedirector
+{
+    public void Go(string url) { Holder.Response.Redirect(url); }
+}
+class SafeRedirector : IRedirector
+{
+    public void Go(string url) { }
+}
+static class Holder { public static HttpResponse Response; }
+class Caller
+{
+    private IRedirector redirector = new SafeRedirector();
+    public void Run(string url)
+    {
+        redirector = new UnsafeRedirector();
+        redirector.Go(url);
+    }
+}";
+            var config = ConfigurationTest.CreateAnalyzersOptionsWithConfig(@"
+TaintEntryPoints:
+  OpenRedirect:
+    Method:
+      Name: Run
+");
+            await VerifyCSharpDiagnostic(code, Expected, config).ConfigureAwait(false);
+        }
+
+        [TestMethod]
         public async Task DetectsTaintInStaticFieldReadByHelper()
         {
             var code = @"

@@ -2553,11 +2553,11 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
                     IParameterSymbol GetMappedParameterForArgument(IArgumentOperation argumentOperation)
                     {
                         if (argumentOperation.Parameter!.ContainingSymbol is IMethodSymbol method &&
-                            method.MethodKind == MethodKind.DelegateInvoke)
+                            (method.MethodKind == MethodKind.DelegateInvoke ||
+                             !method.OriginalDefinition.Equals(invokedMethod.OriginalDefinition)))
                         {
-                            // Parameter associated with IArgumentOperation for delegate invocations
-                            // is the DelegateInvoke method parameter.
-                            // So we need to map it to the parameter of the invoked method by using ordinals.
+                            // Delegate and interface invocation arguments refer to parameters on
+                            // the declared target, rather than on the method body being analyzed.
                             Debug.Assert(invokedMethod.Parameters.Length == method.GetParameters().Length ||
                                 isExtensionMethodInvocationWithOneLessArgument);
 
@@ -3541,10 +3541,64 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow
             IOperation originalOperation,
             TAbstractAnalysisValue defaultValue)
         {
+            if (method.ContainingType.TypeKind == TypeKind.Interface && visitedInstance != null)
+            {
+                var receiver = GetPointsToAbstractValue(visitedInstance);
+                if (receiver.Kind == PointsToAbstractValueKind.KnownLocations)
+                {
+                    var targets = receiver.Locations
+                        .Select(location => location.LocationType)
+                        .OfType<INamedTypeSymbol>()
+                        .Select(type => type.FindImplementationForInterfaceMember(method))
+                        .OfType<IMethodSymbol>()
+                        .Distinct()
+                        .ToImmutableArray();
+                    if (targets.Length == 1)
+                    {
+                        method = targets[0];
+                    }
+                }
+
+                if (method.ContainingType.TypeKind == TypeKind.Interface &&
+                    TryGetFieldInitializerType(visitedInstance) is INamedTypeSymbol initializedType &&
+                    initializedType.FindImplementationForInterfaceMember(method) is IMethodSymbol initializedTarget)
+                {
+                    method = initializedTarget;
+                }
+            }
+
             ControlFlowGraph? getCfg() => GetInterproceduralControlFlowGraph(method);
 
             return PerformInterproceduralAnalysis(getCfg, method, visitedInstance,
                 visitedArguments, originalOperation, defaultValue, isLambdaOrLocalFunction: false, out _);
+        }
+
+        protected INamedTypeSymbol? TryGetFieldInitializerType(IOperation instance)
+        {
+            if (instance is not IFieldReferenceOperation fieldReference ||
+                fieldReference.Field.DeclaringSyntaxReferences.Length != 1)
+            {
+                return null;
+            }
+
+            var syntax = fieldReference.Field.DeclaringSyntaxReferences[0].GetSyntax();
+            var semanticModel = WellKnownTypeProvider.Compilation.GetSemanticModel(syntax.SyntaxTree);
+            var initializer = syntax.DescendantNodes()
+                .Select(node => semanticModel.GetOperation(node))
+                .OfType<IFieldInitializerOperation>()
+                .FirstOrDefault();
+            if (initializer == null)
+            {
+                return null;
+            }
+
+            IOperation value = initializer.Value;
+            while (value is IConversionOperation conversion)
+            {
+                value = conversion.Operand;
+            }
+
+            return value is IObjectCreationOperation creation ? creation.Type as INamedTypeSymbol : null;
         }
 
         private ControlFlowGraph? GetInterproceduralControlFlowGraph(IMethodSymbol method)
