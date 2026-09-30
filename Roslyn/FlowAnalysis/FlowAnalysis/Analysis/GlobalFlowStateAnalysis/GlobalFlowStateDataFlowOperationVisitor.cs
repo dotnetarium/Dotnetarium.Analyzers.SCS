@@ -1,4 +1,5 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the MIT license.  See License.txt in the project root for license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Collections.Generic;
@@ -140,17 +141,19 @@ namespace Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.GlobalFlowStateAnalysis
         protected sealed override void ApplyInterproceduralAnalysisResultCore(DictionaryAnalysisData<AnalysisEntity, TAbstractAnalysisValue> resultData)
             => ApplyInterproceduralAnalysisResultHelper(resultData);
 
-        protected override DictionaryAnalysisData<AnalysisEntity, TAbstractAnalysisValue> GetInitialInterproceduralAnalysisData(
+        protected override (DictionaryAnalysisData<AnalysisEntity, TAbstractAnalysisValue> Data, bool IsTrimmed) GetInitialInterproceduralAnalysisData(
             IMethodSymbol invokedMethod,
+            ControlFlowGraph invokedCfg,
             (AnalysisEntity? Instance, PointsToAbstractValue PointsToValue)? invocationInstance,
             (AnalysisEntity Instance, PointsToAbstractValue PointsToValue)? thisOrMeInstanceForCaller,
             ImmutableDictionary<IParameterSymbol, ArgumentInfo<TAbstractAnalysisValue>> argumentValuesMap,
+            ImmutableDictionary<ISymbol, PointsToAbstractValue> capturedVariablesMap,
             IDictionary<AnalysisEntity, PointsToAbstractValue>? pointsToValues,
             IDictionary<AnalysisEntity, CopyAbstractValue>? copyValues,
             IDictionary<AnalysisEntity, ValueContentAbstractValue>? valueContentValues,
             bool isLambdaOrLocalFunction,
             bool hasParameterWithDelegateType)
-            => GetClonedCurrentAnalysisData();
+            => (GetClonedCurrentAnalysisData(), false);
 
         #region Visitor methods
 
