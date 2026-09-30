@@ -6,7 +6,7 @@ diagnostics back to `.cshtml` and `.razor` through Razor's line directives.
 
 | Execution mode | Input modeled here | Raw-output sinks |
 | --- | --- | --- |
-| Razor Pages | Handler parameters and `[BindProperty]` | `Html.Raw` |
+| Razor Pages | Handler parameters and `[BindProperty]` | `Html.Raw`, `HtmlString` |
 | Static server rendering | Query, form, and matching route parameters | Rendered `MarkupString`, `AddMarkupContent` |
 | Interactive Server | Query and route parameters; form input when server bound | Same raw-output sinks |
 | Interactive WebAssembly with prerendering | Query and route parameters; server-bound form input during prerendering | Same raw-output sinks |
@@ -22,5 +22,5 @@ component explicitly declares WebAssembly rendering with `prerender: false`.
 
 Ordinary string rendering through Razor or `AddContent(string)` is encoded.
 A plain `[Parameter]` is not a source unless its name appears in the
-component's route template. Taint from parent components and browser event
-callbacks is not yet modeled across component boundaries.
+component's route template. Taint from parent components to child parameters
+and from browser event callbacks into later renders is not yet modeled.

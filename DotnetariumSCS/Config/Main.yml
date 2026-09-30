@@ -1579,6 +1579,15 @@ Sinks:
 
  # XSS
 
+  # HtmlString bypasses Razor's normal HTML encoding.
+  - Type: Microsoft.AspNetCore.Html.HtmlString
+    TaintTypes:
+      - SCS0029
+    Methods:
+    - Name: .ctor
+      Arguments:
+        - value
+
   # Blazor's string AddContent overload encodes output. Only the markupContent
   # overload and AddMarkupContent bypass that protection.
   - Type: Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder

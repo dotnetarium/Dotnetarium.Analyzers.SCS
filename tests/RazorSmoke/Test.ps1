@@ -49,7 +49,8 @@ $expected = @(
     'ServerProbe.razor:4:SCS0029',
     'FormProbe.razor:2:SCS0029',
     'RouteProbe.razor:2:SCS0029',
-    'RawPage.cshtml:3:SCS0029'
+    'RawPage.cshtml:3:SCS0029',
+    'RawPage.cshtml:4:SCS0029'
 ) | Sort-Object
 
 if (Compare-Object $expected $actual) {

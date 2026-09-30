@@ -1,4 +1,6 @@
 @page
 @model RazorSmoke.Server.Pages.RawPageModel
 @Html.Raw(Model.Bound)
+@(new Microsoft.AspNetCore.Html.HtmlString(Model.Bound))
 @Html.Raw(Model.ParentOnly)
+@(new Microsoft.AspNetCore.Html.HtmlString(Model.ParentOnly))
