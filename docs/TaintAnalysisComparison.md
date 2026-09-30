@@ -140,22 +140,28 @@ passes action parameters to `DoRepoStuff` and `DoRepoEFCoreStuff`; `Repo`
 concatenates those parameters into SQL sinks. The `db_SqlControllers` branch
 predates the interface cases.
 
-The interprocedural visitor now resolves interface calls from points-to data
-when the receiver's concrete allocation is known. It also recognizes a direct
-concrete field initializer. For a receiver supplied externally, such as an
-injected constructor parameter, taint analysis considers all source
-implementations of the interface as possible targets. This is a may-call
-analysis: it does not prove which implementation a DI container will supply.
-It does not depend on a particular DI framework or registration method.
+The interprocedural visitor resolves interface calls from points-to data when
+the receiver's concrete allocation is known. It also recognizes a direct
+concrete initializer on a readonly field. For an unknown receiver, taint
+analysis considers all source implementations of the interface as possible
+targets. A small, separate model can narrow that set for readonly constructor-
+injected fields on ASP.NET Core controllers when it finds unambiguous built-in
+`IServiceCollection` registrations. It recognizes `AddScoped`, `AddSingleton`,
+`AddTransient`, and their `TryAdd` counterparts with concrete implementation
+types. The last registration wins for a single service; `IEnumerable<T>`
+retains every registration in order. Factories, conditionals, and unknown
+collection calls after the last definite registration keep the wider target
+set. The model does not execute registrations or resolve arbitrary containers.
 
-The SharpSaster build now reports SQL injection through both injected `IRepo`
-calls and reports none for the explicitly initialized `DummyRepo` calls. An
+The SharpSaster build reports SQL injection through both injected `IRepo`
+calls. It also reports possible flows through the publicly mutable `DummyRepo`
+field, because another implementation could replace its initializer. An
 isolated open-redirect reproducer confirms that constructor-stored taint is
 followed through an interface-typed local. A method-local reassignment to a
 different concrete implementation also overrides the field initializer.
 
-The initializer shortcut assumes the directly initialized field still holds
-that implementation unless the current analysis sees a replacement. Mutation
-from another method or external code remains an area for future points-to
-work. Unknown injected receivers can produce possible-flow warnings for
-implementations that are not selected at runtime.
+Unknown injected receivers can produce possible-flow warnings for
+implementations that are not selected at runtime. The DI model only narrows
+direct controller constructor injection; `IEnumerable<T>` resolution is
+modeled for registration ordering but has not yet been connected to collection
+element flow in the taint engine.

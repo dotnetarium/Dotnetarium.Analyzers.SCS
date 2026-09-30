@@ -20,7 +20,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
         private readonly Dictionary<ITypeSymbol, List<Registration>> _registrations =
             new Dictionary<ITypeSymbol, List<Registration>>(SymbolEqualityComparer.Default);
-        private readonly HashSet<string> _opaqueSites = new HashSet<string>();
+        private readonly Dictionary<string, List<int>> _opaqueCalls = new Dictionary<string, List<int>>();
 
         private DependencyInjectionRegistrationModel(Compilation compilation)
         {
@@ -48,14 +48,14 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                     var site = semanticModel.GetEnclosingSymbol(syntax.SpanStart)?.ToDisplayString() + ":" + receiver.Syntax;
                     if (!IsRegistrationMethod(invocation.TargetMethod))
                     {
-                        _opaqueSites.Add(site);
+                        AddOpaqueCall(site, syntax.SpanStart);
                         continue;
                     }
 
                     var serviceType = GetServiceType(invocation);
                     if (serviceType == null)
                     {
-                        _opaqueSites.Add(site);
+                        AddOpaqueCall(site, syntax.SpanStart);
                         continue;
                     }
 
@@ -78,6 +78,17 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             }
         }
 
+        private void AddOpaqueCall(string site, int position)
+        {
+            if (!_opaqueCalls.TryGetValue(site, out var positions))
+            {
+                positions = new List<int>();
+                _opaqueCalls.Add(site, positions);
+            }
+
+            positions.Add(position);
+        }
+
         internal static DependencyInjectionRegistrationModel GetOrCreate(Compilation compilation) =>
             Cache.GetValue(compilation, key => new DependencyInjectionRegistrationModel(key));
 
@@ -85,15 +96,31 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         {
             implementations = ImmutableArray<INamedTypeSymbol>.Empty;
             if (!_registrations.TryGetValue(serviceType, out var registrations) ||
-                registrations.Select(registration => registration.Site).Distinct().Count() != 1 ||
-                _opaqueSites.Contains(registrations[0].Site) ||
-                registrations.Any(registration => registration.Conditional))
+                registrations.Select(registration => registration.Site).Distinct().Count() != 1)
+            {
+                return false;
+            }
+
+            _opaqueCalls.TryGetValue(registrations[0].Site, out var opaqueCalls);
+            var ordered = registrations.OrderBy(registration => registration.Position).ToList();
+            if (!multiple)
+            {
+                // A definite Add overrides earlier registrations for single-service resolution.
+                var lastAdd = ordered.LastOrDefault(registration => !registration.TryAdd && !registration.Conditional);
+                if (lastAdd != null)
+                {
+                    ordered = ordered.Where(registration => registration.Position >= lastAdd.Position).ToList();
+                }
+            }
+
+            if (ordered.Any(registration => registration.Conditional) ||
+                (opaqueCalls != null && opaqueCalls.Any(position => multiple || position >= ordered[0].Position)))
             {
                 return false;
             }
 
             var selected = new List<INamedTypeSymbol>();
-            foreach (var registration in registrations.OrderBy(registration => registration.Position))
+            foreach (var registration in ordered)
             {
                 if (registration.Implementation == null)
                 {

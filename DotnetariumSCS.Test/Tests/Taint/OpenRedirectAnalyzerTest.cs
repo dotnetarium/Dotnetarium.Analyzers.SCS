@@ -165,15 +165,20 @@ TaintEntryPoints:
         [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.TryAddScoped<IRedirector, UnsafeRedirector>();", false)]
         [DataRow("services.AddScoped<IRedirector, UnsafeRedirector>(); services.TryAddScoped<IRedirector, SafeRedirector>();", true)]
         [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.AddScoped<IRedirector>(provider => new UnsafeRedirector());", true)]
+        [DataRow("services.AddUnmodeled(); services.AddScoped<IRedirector, SafeRedirector>();", false)]
+        [DataRow("services.AddScoped<IRedirector, SafeRedirector>(); services.AddUnmodeled();", true)]
         [DataRow("if (flag) services.AddScoped<IRedirector, SafeRedirector>();", true)]
         [DataTestMethod]
         public async Task BuiltInDiRegistrationsNarrowOnlyCertainInjectedTargets(string registrations, bool warn)
         {
+            var tryAddUsing = registrations.Contains("TryAddScoped")
+                ? "using Microsoft.Extensions.DependencyInjection.Extensions;"
+                : "";
             var code = $@"
 using System;
 using System.Web;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
+{tryAddUsing}
 namespace Microsoft.Extensions.DependencyInjection
 {{
     public interface IServiceCollection {{ }}
@@ -182,6 +187,7 @@ namespace Microsoft.Extensions.DependencyInjection
         public static IServiceCollection AddScoped<TService, TImplementation>(this IServiceCollection services)
             where TImplementation : TService => services;
         public static IServiceCollection AddScoped<TService>(this IServiceCollection services, Func<object, TService> factory) => services;
+        public static IServiceCollection AddUnmodeled(this IServiceCollection services) => services;
     }}
 }}
 namespace Microsoft.Extensions.DependencyInjection.Extensions
