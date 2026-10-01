@@ -298,7 +298,7 @@ namespace Dotnetarium.Config
             return handlers.ToImmutable();
         }
 
-        private static bool IsMinimalApiMapMethod(IMethodSymbol method) =>
+        private static bool IsMinimalApiMapMethod(IMethodSymbol? method) =>
             method != null && method.ContainingNamespace.ToDisplayString() == "Microsoft.AspNetCore.Builder" &&
             method.Name is "Map" or "MapGet" or "MapPost" or "MapPut" or "MapDelete" or
                 "MapPatch" or "MapMethods" or "MapFallback";
