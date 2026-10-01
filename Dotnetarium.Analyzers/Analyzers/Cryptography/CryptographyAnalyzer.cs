@@ -133,7 +133,9 @@ namespace Dotnetarium.Analyzers.Cryptography
                 Unwrap(property.Instance) is ILocalReferenceOperation target &&
                 SymbolEqualityComparer.Default.Equals(target.Local, local.Local))
                 .OrderByDescending(assignment => assignment.Syntax.SpanStart).FirstOrDefault();
-            return latest != null && IsFixedMaterial(latest.Value, operations);
+            return latest != null &&
+                !HasInterveningReference(local.Local, latest.Syntax.Span.End, invocation.Syntax.SpanStart, operations) &&
+                IsFixedMaterial(latest.Value, operations);
         }
 
         private static bool SameBlock(IOperation left, IOperation right)
@@ -150,6 +152,11 @@ namespace Dotnetarium.Analyzers.Cryptography
 
         private static IOperation? Argument(ImmutableArray<IArgumentOperation> arguments, string name) =>
             arguments.FirstOrDefault(argument => argument.Parameter?.Name == name)?.Value;
+
+        private static bool HasInterveningReference(ILocalSymbol local, int after, int before, IOperation[] operations) =>
+            operations.OfType<ILocalReferenceOperation>().Any(reference =>
+                reference.Syntax.SpanStart >= after && reference.Syntax.SpanStart < before &&
+                SymbolEqualityComparer.Default.Equals(reference.Local, local));
 
         private static bool IsFixedMaterial(IOperation value, IOperation[] operations, int depth = 0)
         {
@@ -168,10 +175,15 @@ namespace Dotnetarium.Analyzers.Cryptography
                         Unwrap(item.Target) is ILocalReferenceOperation target &&
                         SymbolEqualityComparer.Default.Equals(target.Local, local.Local))
                     .OrderByDescending(item => item.Syntax.SpanStart).FirstOrDefault();
-                if (latest != null) return IsFixedMaterial(latest.Value, operations, depth + 1);
+                if (latest != null)
+                    return !HasInterveningReference(local.Local, latest.Syntax.Span.End,
+                            value.Syntax.SpanStart, operations) &&
+                        IsFixedMaterial(latest.Value, operations, depth + 1);
                 var declaration = operations.OfType<IVariableDeclaratorOperation>()
                     .FirstOrDefault(item => SymbolEqualityComparer.Default.Equals(item.Symbol, local.Local));
                 return declaration?.Initializer != null &&
+                    !HasInterveningReference(local.Local, declaration.Syntax.Span.End,
+                        value.Syntax.SpanStart, operations) &&
                     IsFixedMaterial(declaration.Initializer.Value, operations, depth + 1);
             }
             return false;
