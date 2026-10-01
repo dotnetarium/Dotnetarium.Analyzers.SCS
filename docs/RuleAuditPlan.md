@@ -42,6 +42,11 @@ This review covers the built-in C# rules and models on the 2.x crypto branch. It
 - The path and SSRF rules report untrusted input reaching a sensitive API. They do not prove a path escapes a root or that a relative HTTP URI controls the host.
 - The literal-key rules cannot identify all secrets assembled through helpers, fields, or configuration.
 
+## Precision follow-up
+
+- [x] Recognize a direct redirect in the successful `IsLocalUrl` branch only when the checked value reaches that redirect unchanged.
+- [x] Model request-only `[AsParameters]` aggregates and keep mixed request/service aggregates conservative.
+
 ## Verification
 
 The .NET 10 solution build and analyzer suite passed locally. A CLI scan of a .NET 10 Minimal API project reported the unsafe redirect and wrote its source path relative to the project in SARIF. The rule table was checked against the catalog; all 17 DNA IDs appear above.
