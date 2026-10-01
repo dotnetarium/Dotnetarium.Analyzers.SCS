@@ -36,13 +36,15 @@ public sealed class ConfigurationTests
             new ConfigurationReader().DeserializeAndValidate<ConfigData>(reader, validate: true));
     }
 
-    [Fact]
-    public void Project_models_add_sinks_without_changing_built_ins()
+    [Theory]
+    [InlineData("dotnetarium.json")]
+    [InlineData("Dotnetarium.json")]
+    public void Project_models_add_sinks_without_changing_built_ins(string fileName)
     {
         var reader = new ConfigurationReader();
         var builtin = reader.GetBuiltinConfiguration();
         var project = reader.GetProjectConfiguration(ImmutableArray.Create<AdditionalText>(new TextFile(
-            "Dotnetarium.json", """
+            fileName, """
                 {"Version":"2.0","Sinks":[{"Type":"Example.Query","TaintTypes":["SqlInjection"],"Methods":[{"Name":"Execute","Arguments":["query"]}]}]}
                 """)));
         var merged = new ConfigData();
@@ -51,6 +53,15 @@ public sealed class ConfigurationTests
 
         Assert.Contains(merged.Sinks, sink => sink.Type == "Example.Query");
         Assert.DoesNotContain(builtin.Sinks, sink => sink.Type == "Example.Query");
+    }
+
+    [Fact]
+    public void Same_config_added_twice_is_read_once()
+    {
+        var file = new TextFile("dotnetarium.json", """{"Version":"2.0"}""");
+        var project = new ConfigurationReader().GetProjectConfiguration(
+            ImmutableArray.Create<AdditionalText>(file, file));
+        Assert.Equal("2.0", project.Version);
     }
 
     private sealed class TextFile(string path, string text) : AdditionalText

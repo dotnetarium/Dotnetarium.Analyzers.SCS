@@ -1,141 +1,180 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using Microsoft.CodeAnalysis;
 using Dotnetarium.Analyzers;
+using Microsoft.CodeAnalysis;
 
 namespace Dotnetarium.Tool;
 
 internal static class SarifWriter
 {
-    internal static async Task WriteAsync(string output, string target, IReadOnlyList<Diagnostic> diagnostics,
-        bool absolutePaths)
+    private const string SourceRootId = "%SRCROOT%";
+
+    internal static async Task WriteAsync(string output, string target, IReadOnlyList<Diagnostic> diagnostics)
     {
         var root = Path.GetDirectoryName(Path.GetFullPath(target))!;
-        var rules = diagnostics.Select(diagnostic => diagnostic.Descriptor)
-            .GroupBy(descriptor => descriptor.Id)
+        var descriptors = diagnostics.Select(diagnostic => diagnostic.Descriptor)
+            .GroupBy(descriptor => descriptor.Id, StringComparer.Ordinal)
             .Select(group => group.First())
             .OrderBy(descriptor => descriptor.Id, StringComparer.Ordinal)
-            .Select(descriptor =>
-            {
-                var rule = new JsonObject
-                {
-                    ["id"] = descriptor.Id,
-                    ["name"] = descriptor.Title.ToString(),
-                    ["shortDescription"] = new JsonObject { ["text"] = descriptor.Title.ToString() },
-                    ["fullDescription"] = new JsonObject { ["text"] = descriptor.Description.ToString() },
-                    ["defaultConfiguration"] = new JsonObject { ["level"] = "warning" }
-                };
-                if (descriptor.HelpLinkUri != null) rule["helpUri"] = descriptor.HelpLinkUri;
-                if (DnaRuleCatalog.TryGetCwe(descriptor.Id, out var cwe))
-                    rule["properties"] = new JsonObject
-                    {
-                        ["tags"] = new JsonArray(JsonValue.Create($"CWE-{cwe}"))
-                    };
-                return rule;
-            });
-
-        var results = diagnostics.Select(diagnostic => CreateResult(diagnostic, root, absolutePaths)).ToArray();
-        var run = new JsonObject
-        {
-            ["tool"] = new JsonObject
-            {
-                ["driver"] = new JsonObject
-                {
-                    ["name"] = "Dotnetarium",
-                    ["informationUri"] = "https://github.com/dotnetarium/dotnetarium",
-                    ["rules"] = new JsonArray(rules.Select(rule => (JsonNode?)rule).ToArray())
-                }
-            },
-            ["results"] = new JsonArray(results.Select(result => (JsonNode?)result).ToArray())
-        };
-
-        if (!absolutePaths)
-        {
-            var uri = new Uri(root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar).AbsoluteUri;
-            run["originalUriBaseIds"] = new JsonObject
-            {
-                ["%SRCROOT%"] = new JsonObject { ["uri"] = uri }
-            };
-        }
-
-        var sarif = new JsonObject
-        {
-            ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
-            ["version"] = "2.1.0",
-            ["runs"] = new JsonArray(run)
-        };
+            .ToArray();
+        var ruleIndexes = descriptors.Select((descriptor, index) => (descriptor.Id, index))
+            .ToDictionary(item => item.Id, item => item.index, StringComparer.Ordinal);
 
         var path = Path.GetFullPath(output);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, sarif.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write,
+            FileShare.Read, 64 * 1024, FileOptions.Asynchronous);
+        using var json = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+
+        json.WriteStartObject();
+        json.WriteString("$schema", "https://json.schemastore.org/sarif-2.1.0.json");
+        json.WriteString("version", "2.1.0");
+        json.WriteStartArray("runs");
+        json.WriteStartObject();
+        WriteTool(json, descriptors);
+        WriteSourceRoot(json, root);
+        json.WriteStartArray("results");
+        foreach (var diagnostic in diagnostics)
+            WriteResult(json, diagnostic, root, ruleIndexes[diagnostic.Id]);
+        json.WriteEndArray();
+        json.WriteEndObject();
+        json.WriteEndArray();
+        json.WriteEndObject();
+        await json.FlushAsync();
     }
 
-    private static JsonObject CreateResult(Diagnostic diagnostic, string root, bool absolutePaths)
+    private static void WriteTool(Utf8JsonWriter json, IEnumerable<DiagnosticDescriptor> descriptors)
     {
-        var result = new JsonObject
+        json.WriteStartObject("tool");
+        json.WriteStartObject("driver");
+        json.WriteString("name", "Dotnetarium");
+        json.WriteString("informationUri", "https://github.com/dotnetarium/dotnetarium");
+        json.WriteStartArray("rules");
+        foreach (var descriptor in descriptors)
         {
-            ["ruleId"] = diagnostic.Id,
-            ["level"] = diagnostic.Severity == DiagnosticSeverity.Error ? "error" : "warning",
-            ["message"] = new JsonObject { ["text"] = diagnostic.GetMessage() },
-            ["locations"] = new JsonArray(CreateLocation(diagnostic.Location, root, absolutePaths))
-        };
-
-        var related = diagnostic.AdditionalLocations
-            .Where(location => location.IsInSource && location.SourceTree != null)
-            .Select((location, index) => new JsonObject
+            json.WriteStartObject();
+            json.WriteString("id", descriptor.Id);
+            json.WriteString("name", descriptor.Title.ToString());
+            WriteMessage(json, "shortDescription", descriptor.Title.ToString());
+            WriteMessage(json, "fullDescription", descriptor.Description.ToString());
+            if (!string.IsNullOrEmpty(descriptor.HelpLinkUri))
+                json.WriteString("helpUri", descriptor.HelpLinkUri);
+            json.WriteStartObject("defaultConfiguration");
+            json.WriteString("level", Level(descriptor.DefaultSeverity));
+            json.WriteEndObject();
+            if (DnaRuleCatalog.TryGetCwe(descriptor.Id, out var cwe))
             {
-                ["id"] = index + 1,
-                ["physicalLocation"] = CreatePhysicalLocation(location, root, absolutePaths)
-            });
-        if (diagnostic.AdditionalLocations.Count > 0)
-            result["relatedLocations"] = new JsonArray(related.Select(location => (JsonNode?)location).ToArray());
-
-        if (diagnostic.Properties.TryGetValue("dotnetarium.flow", out var marker) && marker == "true" &&
-            diagnostic.AdditionalLocations.Count >= 2 &&
-            diagnostic.AdditionalLocations.All(location => location.IsInSource && location.SourceTree != null) &&
-            diagnostic.AdditionalLocations[^1].Equals(diagnostic.Location))
-        {
-            var steps = diagnostic.AdditionalLocations
-                .Select(location => new JsonObject
-                {
-                    ["location"] = CreateLocation(location, root, absolutePaths)
-                });
-            result["codeFlows"] = new JsonArray(new JsonObject
-            {
-                ["threadFlows"] = new JsonArray(new JsonObject
-                {
-                    ["locations"] = new JsonArray(steps.Select(step => (JsonNode?)step).ToArray())
-                })
-            });
-        }
-        return result;
-    }
-
-    private static JsonObject CreateLocation(Location location, string root, bool absolutePaths) =>
-        new JsonObject { ["physicalLocation"] = CreatePhysicalLocation(location, root, absolutePaths) };
-
-    private static JsonObject CreatePhysicalLocation(Location location, string root, bool absolutePaths)
-    {
-        var span = location.GetLineSpan();
-        var artifact = new JsonObject
-        {
-            ["uri"] = absolutePaths
-                ? new Uri(Path.GetFullPath(span.Path)).AbsoluteUri
-                : string.Join("/", Path.GetRelativePath(root, span.Path).Replace('\\', '/').Split('/')
-                    .Select(Uri.EscapeDataString))
-        };
-        if (!absolutePaths) artifact["uriBaseId"] = "%SRCROOT%";
-
-        return new JsonObject
-        {
-            ["artifactLocation"] = artifact,
-            ["region"] = new JsonObject
-            {
-                ["startLine"] = span.StartLinePosition.Line + 1,
-                ["startColumn"] = span.StartLinePosition.Character + 1,
-                ["endLine"] = span.EndLinePosition.Line + 1,
-                ["endColumn"] = span.EndLinePosition.Character + 1
+                json.WriteStartObject("properties");
+                json.WriteStartArray("tags");
+                json.WriteStringValue($"CWE-{cwe}");
+                json.WriteEndArray();
+                json.WriteEndObject();
             }
-        };
+            json.WriteEndObject();
+        }
+        json.WriteEndArray();
+        json.WriteEndObject();
+        json.WriteEndObject();
     }
+
+    private static void WriteSourceRoot(Utf8JsonWriter json, string root)
+    {
+        // Results remain relative. The URI base lets local SARIF viewers resolve
+        // them without changing the paths consumed by CI.
+        var rootUri = new Uri(root.TrimEnd(Path.DirectorySeparatorChar,
+            Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar).AbsoluteUri;
+        json.WriteStartObject("originalUriBaseIds");
+        json.WriteStartObject(SourceRootId);
+        json.WriteString("uri", rootUri);
+        WriteMessage(json, "description", "Root of the scanned project or solution.");
+        json.WriteEndObject();
+        json.WriteEndObject();
+    }
+
+    private static void WriteResult(Utf8JsonWriter json, Diagnostic diagnostic, string root,
+        int ruleIndex)
+    {
+        json.WriteStartObject();
+        json.WriteString("ruleId", diagnostic.Id);
+        json.WriteNumber("ruleIndex", ruleIndex);
+        json.WriteString("level", Level(diagnostic.Severity));
+        WriteMessage(json, "message", diagnostic.GetMessage());
+        if (IsSourceLocation(diagnostic.Location))
+        {
+            json.WriteStartArray("locations");
+            WriteLocation(json, diagnostic.Location, root);
+            json.WriteEndArray();
+        }
+
+        var flowLocations = diagnostic.AdditionalLocations.Where(IsSourceLocation).ToArray();
+        if (diagnostic.Properties.TryGetValue("dotnetarium.flow", out var marker) &&
+            marker == "true" && flowLocations.Length >= 2 &&
+            flowLocations.Length == diagnostic.AdditionalLocations.Count &&
+            flowLocations[^1].Equals(diagnostic.Location))
+            WriteCodeFlow(json, flowLocations, root);
+
+        json.WriteEndObject();
+    }
+
+    private static void WriteCodeFlow(Utf8JsonWriter json, IReadOnlyList<Location> locations, string root)
+    {
+        json.WriteStartArray("codeFlows");
+        json.WriteStartObject();
+        json.WriteStartArray("threadFlows");
+        json.WriteStartObject();
+        json.WriteStartArray("locations");
+        for (var index = 0; index < locations.Count; index++)
+        {
+            json.WriteStartObject();
+            json.WritePropertyName("location");
+            WriteLocation(json, locations[index], root, index + 1);
+            json.WriteEndObject();
+        }
+        json.WriteEndArray();
+        json.WriteEndObject();
+        json.WriteEndArray();
+        json.WriteEndObject();
+        json.WriteEndArray();
+    }
+
+    private static void WriteLocation(Utf8JsonWriter json, Location location, string root,
+        int? id = null)
+    {
+        json.WriteStartObject();
+        if (id.HasValue)
+            json.WriteNumber("id", id.Value);
+        json.WriteStartObject("physicalLocation");
+        var span = location.GetLineSpan();
+        var relativePath = Path.GetRelativePath(root, span.Path).Replace('\\', '/');
+        var uri = string.Join("/", relativePath.Split('/').Select(Uri.EscapeDataString));
+        json.WriteStartObject("artifactLocation");
+        json.WriteString("uri", uri);
+        json.WriteString("uriBaseId", SourceRootId);
+        json.WriteEndObject();
+        json.WriteStartObject("region");
+        json.WriteNumber("startLine", span.StartLinePosition.Line + 1);
+        json.WriteNumber("startColumn", span.StartLinePosition.Character + 1);
+        json.WriteNumber("endLine", span.EndLinePosition.Line + 1);
+        json.WriteNumber("endColumn", span.EndLinePosition.Character + 1);
+        json.WriteEndObject();
+        json.WriteEndObject();
+        json.WriteEndObject();
+    }
+
+    private static void WriteMessage(Utf8JsonWriter json, string property, string message)
+    {
+        json.WriteStartObject(property);
+        json.WriteString("text", message);
+        json.WriteEndObject();
+    }
+
+    private static bool IsSourceLocation(Location location) =>
+        location.IsInSource && location.SourceTree != null;
+
+    private static string Level(DiagnosticSeverity severity) => severity switch
+    {
+        DiagnosticSeverity.Error => "error",
+        DiagnosticSeverity.Warning => "warning",
+        DiagnosticSeverity.Info => "note",
+        _ => "none"
+    };
 }

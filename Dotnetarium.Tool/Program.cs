@@ -34,24 +34,16 @@ internal static class Program
                 new ConfigurationReader().GetProjectConfiguration(
                     ImmutableArray.Create<AdditionalText>(new FileAdditionalText(options.ConfigPath)));
 
-            if (options.SdkPath != null)
-            {
-                var sdkPath = Path.GetFullPath(options.SdkPath);
-                var dotnetRoot = Directory.GetParent(Directory.GetParent(sdkPath)!.FullName)!.FullName;
-                if (!File.Exists(Path.Combine(sdkPath, "MSBuild.dll")) ||
-                    !File.Exists(Path.Combine(dotnetRoot, "dotnet.exe")))
-                    throw new ArgumentException("--sdk-path must name a versioned .NET SDK directory.");
-                Environment.SetEnvironmentVariable("DOTNET_ROOT", dotnetRoot);
-                Environment.SetEnvironmentVariable("PATH", dotnetRoot + Path.PathSeparator +
-                    Environment.GetEnvironmentVariable("PATH"));
-                MSBuildLocator.RegisterMSBuildPath(sdkPath);
-            }
-            else
-                MSBuildLocator.RegisterDefaults();
-
             var target = Path.GetFullPath(options.Target);
             if (!File.Exists(target))
                 throw new FileNotFoundException("Project or solution was not found.", target);
+            var root = Path.GetDirectoryName(target)!;
+            var defaultConfig = Path.Combine(root, "dotnetarium.json");
+            var sdkQuery = VisualStudioInstanceQueryOptions.Default;
+            sdkQuery.WorkingDirectory = root;
+            var sdk = MSBuildLocator.QueryVisualStudioInstances(sdkQuery).FirstOrDefault() ??
+                throw new InvalidOperationException("No compatible .NET SDK was found.");
+            MSBuildLocator.RegisterInstance(sdk);
 
             using var workspace = MSBuildWorkspace.Create();
             var workspaceErrors = new List<string>();
@@ -93,9 +85,11 @@ internal static class Program
                 var additionalFiles = project.AnalyzerOptions.AdditionalFiles;
                 if (options.ConfigPath != null)
                     additionalFiles = additionalFiles
-                        .Where(file => !string.Equals(Path.GetFileName(file.Path), "Dotnetarium.json", StringComparison.OrdinalIgnoreCase))
+                        .Where(file => !IsConfigurationFile(file.Path))
                         .Append(new FileAdditionalText(options.ConfigPath))
                         .ToImmutableArray();
+                else if (File.Exists(defaultConfig) && !additionalFiles.Any(file => IsConfigurationFile(file.Path)))
+                    additionalFiles = additionalFiles.Add(new FileAdditionalText(defaultConfig));
                 var analyzerOptions = new AnalyzerOptions(additionalFiles, project.AnalyzerOptions.AnalyzerConfigOptionsProvider);
                 var result = await compilation.WithAnalyzers(analyzers, analyzerOptions).GetAllDiagnosticsAsync();
                 var projectErrors = result.Where(diagnostic =>
@@ -112,7 +106,6 @@ internal static class Program
                 Console.Error.WriteLine("Workspace: " + error);
             compilerErrors |= workspaceFailure;
 
-            var root = Path.GetDirectoryName(target)!;
             var findings = diagnostics
                 .GroupBy(diagnostic => new
                 {
@@ -133,7 +126,7 @@ internal static class Program
                 var path = line.Path;
                 if (!string.IsNullOrEmpty(path))
                     path = Path.GetRelativePath(root, path);
-                var cwe = options.ShowCwe && DnaRuleCatalog.TryGetCwe(diagnostic.Id, out var id)
+                var cwe = DnaRuleCatalog.TryGetCwe(diagnostic.Id, out var id)
                     ? $" [CWE-{id}]" : string.Empty;
                 Console.WriteLine($"{path}({line.StartLinePosition.Line + 1},{line.StartLinePosition.Character + 1}): {diagnostic.Id}{cwe}: {diagnostic.GetMessage()}");
             }
@@ -145,12 +138,12 @@ internal static class Program
                 return 2;
             }
             if (options.SarifPath != null)
-                await SarifWriter.WriteAsync(options.SarifPath, target, findings, options.AbsolutePaths);
-            return options.FailOnFindings && findings.Length > 0 ? 1 : 0;
+                await SarifWriter.WriteAsync(options.SarifPath, target, findings);
+            return options.Fail && findings.Length > 0 ? 1 : 0;
         }
         catch (System.Text.Json.JsonException error)
         {
-            Console.Error.WriteLine("Invalid Dotnetarium.json: " + error.Message);
+            Console.Error.WriteLine("Invalid dotnetarium.json: " + error.Message);
             return 2;
         }
         catch (Exception error)
@@ -162,30 +155,30 @@ internal static class Program
 
     private static void PrintUsage() => Console.WriteLine(
         "Usage: dotnetarium <solution.sln|project.csproj> [options]\n" +
-        "  -x, --sarif <path>          Write SARIF 2.1.0\n" +
-        "  -c, --config <path>         Load Dotnetarium.json (version 2.0)\n" +
-        "  --sdk-path <path>          Use a specific .NET SDK MSBuild directory\n" +
-        "  --sarif-absolute-paths     Keep absolute source paths in SARIF\n" +
-        "  --cwe                      Show CWE groups in console output\n" +
-        "  -f, --fail-any-warn        Return 1 when findings are present\n" +
+        "  --sarif <path>             Write SARIF 2.1.0\n" +
+        "  --config <path>            Override dotnetarium.json (version 2.0)\n" +
+        "  --fail                     Return 1 when findings are present\n" +
         "  -h, --help                 Show this help");
 
     private sealed class FileAdditionalText(string path) : AdditionalText
     {
         private readonly string sourcePath = System.IO.Path.GetFullPath(path);
         public override string Path { get; } = System.IO.Path.Combine(
-            System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!, "Dotnetarium.json");
+            System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!, "dotnetarium.json");
         public override SourceText GetText(CancellationToken cancellationToken = default) =>
             SourceText.From(File.ReadAllText(sourcePath));
     }
 
+    private static bool IsConfigurationFile(string path) =>
+        string.Equals(Path.GetFileName(path), "dotnetarium.json", StringComparison.OrdinalIgnoreCase);
+
     private sealed record Options(string Target, string? SarifPath, string? ConfigPath,
-        string? SdkPath, bool AbsolutePaths, bool FailOnFindings, bool ShowCwe)
+        bool Fail)
     {
         internal static Options Parse(string[] args)
         {
-            string? target = null, sarif = null, config = null, sdk = null;
-            bool absolute = false, fail = false, cwe = false;
+            string? target = null, sarif = null, config = null;
+            bool fail = false;
             for (int index = 0; index < args.Length; index++)
             {
                 var arg = args[index];
@@ -193,13 +186,9 @@ internal static class Program
                     ? args[index] : throw new ArgumentException($"Missing value after {arg}.");
                 switch (arg)
                 {
-                    case "scan": break;
-                    case "-x": case "--sarif": case "--export": sarif = NextValue(); break;
-                    case "-c": case "--config": config = NextValue(); break;
-                    case "--sdk-path": sdk = NextValue(); break;
-                    case "--sarif-absolute-paths": absolute = true; break;
-                    case "-f": case "--fail-any-warn": fail = true; break;
-                    case "--cwe": cwe = true; break;
+                    case "--sarif": sarif = NextValue(); break;
+                    case "--config": config = NextValue(); break;
+                    case "--fail": fail = true; break;
                     default:
                         if (arg.StartsWith("-", StringComparison.Ordinal))
                             throw new ArgumentException($"Unknown option {arg}.");
@@ -211,7 +200,7 @@ internal static class Program
             }
             if (target == null) throw new ArgumentException("A project or solution path is required.");
             if (config != null && !File.Exists(config)) throw new ArgumentException($"Configuration not found: {config}");
-            return new Options(target, sarif, config, sdk, absolute, fail, cwe);
+            return new Options(target, sarif, config, fail);
         }
     }
 }
