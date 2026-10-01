@@ -29,20 +29,63 @@ public sealed partial class SinkCoverageTests
 
     public static IEnumerable<object[]> MemberCases => MemberProbes.Select((_, index) => new object[] { index });
 
+    private sealed record ExtraArgumentProbe(string Type, string Method, string Argument, string Statement);
+    private static readonly ExtraArgumentProbe[] ExtraArgumentProbes =
+    [
+        new("System.Diagnostics.Process", "Start", "arguments", "_ = System.Diagnostics.Process.Start(\"fixed\", input);"),
+        new("System.IO.Directory", "CreateSymbolicLink", "pathToTarget", "_ = System.IO.Directory.CreateSymbolicLink(\"fixed\", input);"),
+        new("System.IO.Directory", "Move", "destDirName", "System.IO.Directory.Move(\"fixed\", input);"),
+        new("System.IO.File", "Copy", "destFileName", "System.IO.File.Copy(\"fixed\", input);"),
+        new("System.IO.File", "CreateSymbolicLink", "pathToTarget", "_ = System.IO.File.CreateSymbolicLink(\"fixed\", input);"),
+        new("System.IO.File", "Move", "destFileName", "System.IO.File.Move(\"fixed\", input);"),
+        new("System.IO.File", "Replace", "destinationFileName", "System.IO.File.Replace(\"fixed\", input, \"backup\");"),
+        new("System.IO.File", "Replace", "destinationBackupFileName", "System.IO.File.Replace(\"fixed\", \"destination\", input);"),
+        new("System.IO.FileInfo", "Replace", "destinationBackupFileName", "_ = new System.IO.FileInfo(\"fixed\").Replace(\"destination\", input);")
+    ];
+
+    [Fact]
+    public void Every_additional_sink_argument_has_a_compiled_witness()
+    {
+        var expected = new ConfigurationReader().GetBuiltinConfiguration().Sinks
+            .SelectMany(sink => (sink.Methods ?? []).SelectMany(method =>
+                (method.Arguments ?? []).Skip(1).Select(argument => (sink.Type, Method: method.Name, Argument: argument))));
+        var actual = ExtraArgumentProbes.Select(probe => (probe.Type, probe.Method, probe.Argument));
+        Assert.Equal(expected.OrderBy(item => item.ToString(), StringComparer.Ordinal),
+            actual.OrderBy(item => item.ToString(), StringComparer.Ordinal));
+    }
+
+    public static IEnumerable<object[]> ExtraArgumentCases =>
+        ExtraArgumentProbes.Select((_, index) => new object[] { index });
+
+    [Theory]
+    [MemberData(nameof(ExtraArgumentCases))]
+    public async Task Additional_sink_argument_is_reached(int index)
+    {
+        var probe = ExtraArgumentProbes[index];
+        var rule = RuleFor(new ConfigurationReader().GetBuiltinConfiguration().Sinks
+            .Single(sink => sink.Type == probe.Type).TaintTypes.Single());
+        await AssertWitness(probe.Type + "." + probe.Method + "(" + probe.Argument + ")", probe.Statement, rule);
+    }
+
     [Theory]
     [MemberData(nameof(MemberCases))]
     public async Task Built_in_sink_member_is_reached_by_its_rule(int index)
     {
         var probe = MemberProbes[index];
-        var tree = CSharpSyntaxTree.ParseText(SourceFor(probe.Statement),
+        await AssertWitness(probe.Type + "." + probe.Member, probe.Statement, probe.Rule);
+    }
+
+    private static async Task AssertWitness(string name, string statement, string rule)
+    {
+        var tree = CSharpSyntaxTree.ParseText(SourceFor(statement),
             new CSharpParseOptions(LanguageVersion.Preview), "SinkMemberProbe.cs");
         var compilation = CSharpCompilation.Create("SinkMemberProbe", [tree], References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.True(!compilation.GetDiagnostics().Any(d => d.Severity == DiagnosticSeverity.Error),
-            $"{probe.Type}.{probe.Member}: {string.Join("; ", compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error))}");
-        var diagnostics = await compilation.WithAnalyzers([AnalyzerFor(probe.Rule)]).GetAnalyzerDiagnosticsAsync();
-        Assert.True(diagnostics.Any(diagnostic => diagnostic.Id == probe.Rule),
-            $"{probe.Type}.{probe.Member} did not report {probe.Rule}: {string.Join("; ", diagnostics.Select(d => d.ToString()))}");
+            $"{name}: {string.Join("; ", compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error))}");
+        var diagnostics = await compilation.WithAnalyzers([AnalyzerFor(rule)]).GetAnalyzerDiagnosticsAsync();
+        Assert.True(diagnostics.Any(diagnostic => diagnostic.Id == rule),
+            $"{name} did not report {rule}: {string.Join("; ", diagnostics.Select(d => d.ToString()))}");
     }
 
     private static IEnumerable<MemberProbe> CreateMemberProbes()

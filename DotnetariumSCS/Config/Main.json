@@ -1624,7 +1624,6 @@
         {
           "Name": ".ctor",
           "Arguments": [
-            "handle",
             "path"
           ]
         }
