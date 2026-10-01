@@ -91,6 +91,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           Get-ChildItem artifacts -Filter '*.nupkg' | ForEach-Object {
-            gh release upload $env:GITHUB_REF_NAME $_.FullName --clobber
+            gh release upload $env:GITHUB_REF_NAME $_.FullName --clobber --repo $env:GITHUB_REPOSITORY
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
