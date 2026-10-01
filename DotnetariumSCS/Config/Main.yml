@@ -1588,6 +1588,16 @@ Sinks:
       Arguments:
         - value
 
+  # AppendHtml(string) trusts that its input has already been HTML encoded.
+  - Type: Microsoft.AspNetCore.Html.IHtmlContentBuilder
+    TaintTypes:
+      - SCS0029
+    IsInterface: true
+    Methods:
+    - Name: AppendHtml
+      Arguments:
+        - encoded
+
   # Blazor's string AddContent overload encodes output. Only the markupContent
   # overload and AddMarkupContent bypass that protection.
   - Type: Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder

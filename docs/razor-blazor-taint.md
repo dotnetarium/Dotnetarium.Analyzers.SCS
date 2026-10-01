@@ -6,7 +6,7 @@ diagnostics back to `.cshtml` and `.razor` through Razor's line directives.
 
 | Execution mode | Input modeled here | Raw-output sinks |
 | --- | --- | --- |
-| Razor Pages | Handler parameters and `[BindProperty]` | `Html.Raw`, `HtmlString` |
+| Razor Pages | Handler parameters and `[BindProperty]` | `Html.Raw`, `HtmlString`, `IHtmlContentBuilder.AppendHtml(string)` |
 | Static server rendering | Query, form, and matching route parameters | Rendered `MarkupString`, `AddMarkupContent` |
 | Interactive Server | Query and route parameters; form input when server bound | Same raw-output sinks |
 | Interactive WebAssembly with prerendering | Query and route parameters; server-bound form input during prerendering | Same raw-output sinks |
