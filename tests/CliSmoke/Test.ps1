@@ -14,6 +14,7 @@ $scratch = Join-Path $env:TEMP ('dotnetarium-cli-smoke-' + [guid]::NewGuid().ToS
 $toolPath = Join-Path $scratch 'tool'
 $projectPath = Join-Path $scratch 'project'
 New-Item -ItemType Directory -Path $scratch, $toolPath, $projectPath -Force | Out-Null
+$env:NUGET_PACKAGES = Join-Path $scratch 'packages'
 
 & dotnet new classlib -n CliSmoke -o $projectPath --force --no-restore | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Could not create CLI fixture.' }
@@ -31,6 +32,10 @@ public class Demo
         Process.Start(input!);
         using var client = new HttpClient();
         await client.GetStringAsync(input);
+        var settings = new Newtonsoft.Json.JsonSerializerSettings
+        {
+            TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All
+        };
         new Custom().Execute(input!);
     }
 }
@@ -38,6 +43,15 @@ public class Demo
 public class Custom
 {
     public void Execute(string query) { }
+}
+
+namespace Newtonsoft.Json
+{
+    public enum TypeNameHandling { None, All }
+    public sealed class JsonSerializerSettings
+    {
+        public TypeNameHandling TypeNameHandling { get; set; }
+    }
 }
 '@ | Set-Content -LiteralPath (Join-Path $projectPath 'Class1.cs') -Encoding utf8
 $project = Join-Path $projectPath 'CliSmoke.csproj'
@@ -54,7 +68,7 @@ $nugetConfig = Join-Path $scratch 'NuGet.Config'
 if ($LASTEXITCODE -ne 0) { throw 'CLI fixture restore failed.' }
 $buildOutput = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
 if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0002') -or
-    -not ($buildOutput -match 'DNA0011')) {
+    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011')) {
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 10 findings.'
 }
@@ -71,12 +85,13 @@ if ($LASTEXITCODE -ne 1) { throw 'CLI did not report security findings with exit
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 1 -or
+    @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
     @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))
 }
 foreach ($result in $report.runs[0].results) {
     if ($result.locations[0].physicalLocation.artifactLocation.uri -ne 'Class1.cs' -or
-        @($result.codeFlows).Count -ne 1) {
+        ($result.ruleId -ne 'DNA0008' -and @($result.codeFlows).Count -ne 1)) {
         throw ('Missing relative path or engine flow for ' + $result.ruleId)
     }
 }
@@ -90,7 +105,7 @@ $projectXml.Replace('<TargetFramework>net10.0</TargetFramework>',
 if ($LASTEXITCODE -ne 0) { throw '.NET 8 fixture restore failed.' }
 $buildOutput = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
 if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0002') -or
-    -not ($buildOutput -match 'DNA0011')) {
+    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011')) {
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
