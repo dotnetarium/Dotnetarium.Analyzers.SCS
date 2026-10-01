@@ -5,23 +5,28 @@ source of truth is `main`. Both packages use the same version.
 
 ## One-time NuGet setup
 
-In the `dbalikhin` NuGet.org account, add a Trusted Publishing policy for
-GitHub owner `dotnetarium`, repository `dotnetarium`, workflow file
-`publish.yml`, with no environment. Allow publishing new packages and new
-versions for `Dotnetarium*`. This covers `Dotnetarium.Analyzers` and
-`dotnetarium` without a stored API key.
+1. In GitHub repository settings, create the `nuget-publish` environment.
+   Restrict deployments to `v2.*` tags and require a reviewer for publishing.
+2. In the `dbalikhin` NuGet.org account, add a Trusted Publishing policy with:
+   GitHub owner `dotnetarium`, repository `dotnetarium`, workflow file
+   `publish.yml` (filename only), and environment `nuget-publish`.
+3. Allow publishing new packages and new versions for `Dotnetarium*`. The
+   pattern covers `Dotnetarium.Analyzers` and `dotnetarium`. No NuGet API key
+   secret is needed.
 
 ## Release
 
 1. Set the same version in `Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj`
    and `Dotnetarium.Tool/Dotnetarium.Tool.csproj`, and update the installation
    examples in the root README. Merge the change to `main` after CI passes.
-2. Tag that commit `v<version>`, such as `v2.0.0`.
+2. Tag that merged commit `v<version>`, such as `v2.0.0`. Verify the tag
+   points to the release commit before publishing the GitHub release.
 3. Publish a GitHub release for that tag. Keep the description to short
    **Features** and **Bug fixes** bullets, any essential upgrade note, and a
    full changelog link.
-4. The release workflow checks the tag, tests and packs both packages,
-   installs them in the CLI smoke test, publishes them to NuGet.org, and adds
+4. The release workflow checks the tag, tests and packs both packages, then
+   waits for approval of the `nuget-publish` environment. The publishing job
+   obtains a short-lived NuGet credential, publishes both packages, and adds
    the `.nupkg` files to the GitHub release. Verify both package pages and a
    fresh `dotnet tool install --global dotnetarium` after indexing.
 5. After the new packages are available, deprecate the 1.x package IDs on
