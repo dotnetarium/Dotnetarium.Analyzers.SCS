@@ -16,10 +16,10 @@ The analyzer targets `netstandard2.0` for the Roslyn host and uses Roslyn 5.0, w
 ## Scan
 
 ```powershell
-dotnetarium MyApp.sln --sarif results.sarif --cwe --fail-any-warn
+dotnetarium MyApp.sln --sarif results.sarif --fail-on-findings
 ```
 
-SARIF source paths are relative to the solution or project directory by default. `--sarif-absolute-paths` retains absolute file URIs for consumers that require them. `--sdk-path` selects a versioned SDK directory when automatic SDK discovery cannot load a project. Run `dotnetarium --help` for all options.
+SARIF source paths are relative to the solution or project directory. CWE groups appear in console output and SARIF rule metadata by default. Run `dotnetarium --help` for all options.
 
 ## Moving from 1.x
 

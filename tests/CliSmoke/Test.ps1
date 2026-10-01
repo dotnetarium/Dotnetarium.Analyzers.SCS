@@ -58,7 +58,7 @@ namespace Newtonsoft.Json
         public TypeNameHandling TypeNameHandling { get; set; }
     }
 }
-'@ | Set-Content -LiteralPath (Join-Path $projectPath 'Class1.cs') -Encoding utf8
+'@ | Set-Content -LiteralPath (Join-Path $projectPath 'Unsafe Input.cs') -Encoding utf8
 $project = Join-Path $projectPath 'CliSmoke.csproj'
 $projectXml = Get-Content -LiteralPath $project -Raw
 $packageReference = "  <ItemGroup><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
@@ -81,12 +81,16 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
 & dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --add-source $feed --ignore-failed-sources --no-cache
 if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
 $tool = Join-Path $toolPath 'dotnetarium.exe'
-$sdkRoot = Split-Path (Get-Command dotnet).Source -Parent
-$sdkVersion = (& dotnet --version).Trim()
-$sdkPath = Join-Path $sdkRoot ('sdk/' + $sdkVersion)
+$help = & $tool --help
+if ($LASTEXITCODE -ne 0 -or -not ($help -match '--sarif') -or
+    -not ($help -match '--fail-on-findings') -or
+    ($help -match '--sdk-path|--sarif-absolute-paths|--cwe|--export|--fail-any-warn')) {
+    throw 'CLI help does not match the simplified options.'
+}
 $sarif = Join-Path $scratch 'results.sarif'
-& $tool $project --sdk-path $sdkPath --sarif $sarif --fail-any-warn | Out-Null
+$scanOutput = & $tool $project --sarif $sarif --fail-on-findings
 if ($LASTEXITCODE -ne 1) { throw 'CLI did not report security findings with exit code 1.' }
+if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default CWE groups.' }
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
@@ -96,10 +100,24 @@ if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))
 }
 foreach ($result in $report.runs[0].results) {
-    if ($result.locations[0].physicalLocation.artifactLocation.uri -ne 'Class1.cs' -or
+    if ($result.locations[0].physicalLocation.artifactLocation.uri -ne 'Unsafe%20Input.cs' -or
+        $result.locations[0].physicalLocation.artifactLocation.uriBaseId -ne '%SRCROOT%' -or
+        $result.PSObject.Properties.Name -contains 'relatedLocations' -or
         ($result.ruleId -ne 'DNA0008' -and @($result.codeFlows).Count -ne 1)) {
-        throw ('Missing relative path or engine flow for ' + $result.ruleId)
+        throw ('Invalid relative path or engine flow for ' + $result.ruleId)
     }
+    if ($report.runs[0].tool.driver.rules[$result.ruleIndex].id -ne $result.ruleId) {
+        throw ('Finding does not reference its rule definition: ' + $result.ruleId)
+    }
+}
+$ruleIds = @($report.runs[0].tool.driver.rules | ForEach-Object id)
+if (@($ruleIds | Sort-Object -Unique).Count -ne $ruleIds.Count) {
+    throw 'SARIF repeats a rule definition.'
+}
+$flow = @($report.runs[0].results | Where-Object ruleId -eq 'DNA0001')[0].codeFlows[0].threadFlows[0].locations
+if ($flow.Count -lt 2 -or $flow[0].location.id -ne 1 -or
+    $flow[-1].location.physicalLocation.artifactLocation.uri -ne 'Unsafe%20Input.cs') {
+    throw 'SARIF flow steps are missing stable locations.'
 }
 
 # The same analyzer package and .NET 10-hosted tool must also scan .NET 8 code.
@@ -115,7 +133,7 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
-& $tool $project --sdk-path $sdkPath --fail-any-warn | Out-Null
+& $tool $project --fail-on-findings | Out-Null
 if ($LASTEXITCODE -ne 1) { throw 'Global tool did not find the .NET 8 flows.' }
 
 $config = Join-Path $scratch 'custom.json'
@@ -131,21 +149,21 @@ $config = Join-Path $scratch 'custom.json'
   ]
 }
 '@ | Set-Content -LiteralPath $config -Encoding utf8
-$customOutput = & $tool $project --sdk-path $sdkPath --config $config
+$customOutput = & $tool $project --config $config
 if ($LASTEXITCODE -ne 0 -or -not ($customOutput -match 'DNA0001')) {
     throw 'CLI did not load the custom JSON sink.'
 }
 
 $bad = Join-Path $scratch 'bad.json'
 '{"Version":"2.0","Sinkz":[]}' | Set-Content -LiteralPath $bad -Encoding utf8
-$badOutput = & $tool $project --sdk-path $sdkPath --config $bad 2>&1
+$badOutput = & $tool $project --config $bad 2>&1
 if ($LASTEXITCODE -ne 2 -or -not ($badOutput -match 'Invalid Dotnetarium.json')) {
     throw 'CLI did not reject an invalid JSON rule field.'
 }
 
-Add-Content -LiteralPath (Join-Path $projectPath 'Class1.cs') -Value 'class Broken { MissingType value; }'
+Add-Content -LiteralPath (Join-Path $projectPath 'Unsafe Input.cs') -Value 'class Broken { MissingType value; }'
 $incompleteSarif = Join-Path $scratch 'incomplete.sarif'
-$invalidProjectOutput = & $tool $project --sdk-path $sdkPath --sarif $incompleteSarif 2>&1
+$invalidProjectOutput = & $tool $project --sarif $incompleteSarif 2>&1
 if ($LASTEXITCODE -ne 2 -or -not ($invalidProjectOutput -match 'CS0246') -or
     -not ($invalidProjectOutput -match 'Scan incomplete') -or
     (Test-Path -LiteralPath $incompleteSarif)) {

@@ -34,20 +34,7 @@ internal static class Program
                 new ConfigurationReader().GetProjectConfiguration(
                     ImmutableArray.Create<AdditionalText>(new FileAdditionalText(options.ConfigPath)));
 
-            if (options.SdkPath != null)
-            {
-                var sdkPath = Path.GetFullPath(options.SdkPath);
-                var dotnetRoot = Directory.GetParent(Directory.GetParent(sdkPath)!.FullName)!.FullName;
-                if (!File.Exists(Path.Combine(sdkPath, "MSBuild.dll")) ||
-                    !File.Exists(Path.Combine(dotnetRoot, "dotnet.exe")))
-                    throw new ArgumentException("--sdk-path must name a versioned .NET SDK directory.");
-                Environment.SetEnvironmentVariable("DOTNET_ROOT", dotnetRoot);
-                Environment.SetEnvironmentVariable("PATH", dotnetRoot + Path.PathSeparator +
-                    Environment.GetEnvironmentVariable("PATH"));
-                MSBuildLocator.RegisterMSBuildPath(sdkPath);
-            }
-            else
-                MSBuildLocator.RegisterDefaults();
+            MSBuildLocator.RegisterDefaults();
 
             var target = Path.GetFullPath(options.Target);
             if (!File.Exists(target))
@@ -133,7 +120,7 @@ internal static class Program
                 var path = line.Path;
                 if (!string.IsNullOrEmpty(path))
                     path = Path.GetRelativePath(root, path);
-                var cwe = options.ShowCwe && DnaRuleCatalog.TryGetCwe(diagnostic.Id, out var id)
+                var cwe = DnaRuleCatalog.TryGetCwe(diagnostic.Id, out var id)
                     ? $" [CWE-{id}]" : string.Empty;
                 Console.WriteLine($"{path}({line.StartLinePosition.Line + 1},{line.StartLinePosition.Character + 1}): {diagnostic.Id}{cwe}: {diagnostic.GetMessage()}");
             }
@@ -145,7 +132,7 @@ internal static class Program
                 return 2;
             }
             if (options.SarifPath != null)
-                await SarifWriter.WriteAsync(options.SarifPath, target, findings, options.AbsolutePaths);
+                await SarifWriter.WriteAsync(options.SarifPath, target, findings);
             return options.FailOnFindings && findings.Length > 0 ? 1 : 0;
         }
         catch (System.Text.Json.JsonException error)
@@ -162,12 +149,9 @@ internal static class Program
 
     private static void PrintUsage() => Console.WriteLine(
         "Usage: dotnetarium <solution.sln|project.csproj> [options]\n" +
-        "  -x, --sarif <path>          Write SARIF 2.1.0\n" +
-        "  -c, --config <path>         Load Dotnetarium.json (version 2.0)\n" +
-        "  --sdk-path <path>          Use a specific .NET SDK MSBuild directory\n" +
-        "  --sarif-absolute-paths     Keep absolute source paths in SARIF\n" +
-        "  --cwe                      Show CWE groups in console output\n" +
-        "  -f, --fail-any-warn        Return 1 when findings are present\n" +
+        "  --sarif <path>             Write SARIF 2.1.0\n" +
+        "  --config <path>            Load Dotnetarium.json (version 2.0)\n" +
+        "  --fail-on-findings         Return 1 when findings are present\n" +
         "  -h, --help                 Show this help");
 
     private sealed class FileAdditionalText(string path) : AdditionalText
@@ -180,12 +164,12 @@ internal static class Program
     }
 
     private sealed record Options(string Target, string? SarifPath, string? ConfigPath,
-        string? SdkPath, bool AbsolutePaths, bool FailOnFindings, bool ShowCwe)
+        bool FailOnFindings)
     {
         internal static Options Parse(string[] args)
         {
-            string? target = null, sarif = null, config = null, sdk = null;
-            bool absolute = false, fail = false, cwe = false;
+            string? target = null, sarif = null, config = null;
+            bool fail = false;
             for (int index = 0; index < args.Length; index++)
             {
                 var arg = args[index];
@@ -193,13 +177,9 @@ internal static class Program
                     ? args[index] : throw new ArgumentException($"Missing value after {arg}.");
                 switch (arg)
                 {
-                    case "scan": break;
-                    case "-x": case "--sarif": case "--export": sarif = NextValue(); break;
-                    case "-c": case "--config": config = NextValue(); break;
-                    case "--sdk-path": sdk = NextValue(); break;
-                    case "--sarif-absolute-paths": absolute = true; break;
-                    case "-f": case "--fail-any-warn": fail = true; break;
-                    case "--cwe": cwe = true; break;
+                    case "--sarif": sarif = NextValue(); break;
+                    case "--config": config = NextValue(); break;
+                    case "--fail-on-findings": fail = true; break;
                     default:
                         if (arg.StartsWith("-", StringComparison.Ordinal))
                             throw new ArgumentException($"Unknown option {arg}.");
@@ -211,7 +191,7 @@ internal static class Program
             }
             if (target == null) throw new ArgumentException("A project or solution path is required.");
             if (config != null && !File.Exists(config)) throw new ArgumentException($"Configuration not found: {config}");
-            return new Options(target, sarif, config, sdk, absolute, fail, cwe);
+            return new Options(target, sarif, config, fail);
         }
     }
 }

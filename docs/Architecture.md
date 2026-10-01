@@ -22,9 +22,9 @@ remain in this repository. The separate `dotnetarium/analyzers` repository is
 reference material and is not a runtime dependency.
 
 The engine attaches source-to-sink witnesses to diagnostics. The tool emits
-complete witnesses as SARIF `codeFlows` and retains `relatedLocations` for
-consumers that use them. Paths are relative to the scanned project or solution
-by default.
+complete witnesses as SARIF `codeFlows`. Rule descriptions appear once in the
+SARIF rule table; findings reference those rules by ID and index. Source paths
+are relative to the scanned project or solution.
 
 Interface dispatch considers implementations present in the source. For
 constructor-injected ASP.NET Core controllers, unambiguous built-in
