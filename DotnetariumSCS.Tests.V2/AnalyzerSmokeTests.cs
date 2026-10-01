@@ -32,6 +32,22 @@ public sealed class AnalyzerSmokeTests
     }
 
     [Fact]
+    public async Task Follows_a_source_returned_by_a_helper_into_a_caller_sink()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using System.Diagnostics;
+            public class Demo
+            {
+                private static string ReadInput() => Console.ReadLine()!;
+                public static void Run() => Process.Start(ReadInput());
+            }
+            """, new CommandInjectionTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0002"));
+    }
+
+    [Fact]
     public async Task Api_controller_attribute_marks_nonstandard_controller_name_as_input()
     {
         var diagnostics = await AnalyzeAsync("""
@@ -78,6 +94,40 @@ public sealed class AnalyzerSmokeTests
             """, new OpenRedirectTaintAnalyzer());
 
         Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Does_not_follow_unregistered_unsafe_implementation_when_safe_service_is_registered()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            using Microsoft.Extensions.DependencyInjection;
+            public interface IRedirector { void Go(string url); }
+            public class UnsafeRedirector : IRedirector
+            {
+                public void Go(string url) => Holder.Response.Redirect(url);
+            }
+            public class SafeRedirector : IRedirector
+            {
+                public void Go(string url) { }
+            }
+            public static class Holder { public static HttpResponse Response = null!; }
+            [ApiController]
+            public class Endpoint : ControllerBase
+            {
+                private readonly IRedirector redirector;
+                public Endpoint(IRedirector redirector) => this.redirector = redirector;
+                public void Go(string url) => redirector.Go(url);
+            }
+            static class Services
+            {
+                public static void Configure(IServiceCollection services) =>
+                    services.AddScoped<IRedirector, SafeRedirector>();
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DNA0005");
     }
 
     [Fact]
