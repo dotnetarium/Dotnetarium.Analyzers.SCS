@@ -243,6 +243,147 @@ public sealed class AnalyzerSmokeTests
     }
 
     [Fact]
+    public async Task Redirect_in_successful_IsLocalUrl_branch_is_allowed()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Mvc;
+            [ApiController]
+            public class Endpoint : ControllerBase
+            {
+                public IActionResult Go(string url)
+                {
+                    if (Url.IsLocalUrl(url))
+                    {
+                        return Redirect(url);
+                    }
+                    return NotFound();
+                }
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DNA0005");
+    }
+
+    [Fact]
+    public async Task IsLocalUrl_guard_must_check_the_redirected_value_and_prevent_reassignment()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Mvc;
+            [ApiController]
+            public class Endpoint : ControllerBase
+            {
+                public IActionResult WrongValue(string url, string other)
+                {
+                    if (Url.IsLocalUrl(other)) return Redirect(url);
+                    return NotFound();
+                }
+                public IActionResult Changed(string url, string other)
+                {
+                    if (Url.IsLocalUrl(url))
+                    {
+                        url = other;
+                        return Redirect(url);
+                    }
+                    return NotFound();
+                }
+                public IActionResult WrongBranch(string url)
+                {
+                    if (Url.IsLocalUrl(url)) return NotFound();
+                    else return Redirect(url);
+                }
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Unrelated_IsLocalUrl_lookalike_does_not_guard_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Mvc;
+            public static class UnsafeCheck { public static bool IsLocalUrl(string url) => true; }
+            [ApiController]
+            public class Endpoint : ControllerBase
+            {
+                public IActionResult Go(string url)
+                {
+                    if (UnsafeCheck.IsLocalUrl(url)) return Redirect(url);
+                    return NotFound();
+                }
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Minimal_api_static_IsLocalUrl_guard_is_allowed()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Http.HttpResults;
+            public class Demo
+            {
+                public static void Map(WebApplication app) => app.MapGet("/go", (string url) =>
+                {
+                    if (RedirectHttpResult.IsLocalUrl(url)) return Results.Redirect(url);
+                    return Results.NotFound();
+                });
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DNA0005");
+    }
+
+    [Fact]
+    public async Task Request_only_AsParameters_aggregate_reaches_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public sealed class Request
+            {
+                [FromQuery] public string Url { get; set; } = "";
+                public int Page { get; set; }
+            }
+            public class Demo
+            {
+                public static void Map(WebApplication app) =>
+                    app.MapGet("/go", ([AsParameters] Request request) => Results.Redirect(request.Url));
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Mixed_AsParameters_aggregate_does_not_taint_injected_service()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public sealed class DestinationService { public string Url => "https://example.test"; }
+            public sealed class Request
+            {
+                [FromQuery] public string Url { get; set; } = "";
+                [FromServices] public DestinationService Destination { get; set; } = null!;
+            }
+            public class Demo
+            {
+                public static void Map(WebApplication app) =>
+                    app.MapGet("/go", ([AsParameters] Request request) =>
+                        Results.Redirect(request.Destination.Url));
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DNA0005");
+    }
+
+    [Fact]
     public async Task Parsing_relative_uri_does_not_sanitize_redirect()
     {
         var diagnostics = await AnalyzeAsync("""

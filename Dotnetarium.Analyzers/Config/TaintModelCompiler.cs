@@ -244,10 +244,7 @@ namespace Dotnetarium.Config
 
         private bool IsMinimalApiInputParameter(IParameterSymbol parameter, Compilation compilation)
         {
-            if (parameter.GetAttributes().Any(attribute =>
-                attribute.AttributeClass?.ToDisplayString() is
-                    "Microsoft.AspNetCore.Mvc.FromServicesAttribute" or
-                    "Microsoft.AspNetCore.Http.AsParametersAttribute"))
+            if (HasAttribute(parameter, "Microsoft.AspNetCore.Mvc.FromServicesAttribute"))
                 return false;
 
             var syntax = parameter.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
@@ -262,6 +259,9 @@ namespace Dotnetarium.Config
             if (!isLambdaHandler && !isNamedHandler)
                 return false;
 
+            if (HasAttribute(parameter, "Microsoft.AspNetCore.Http.AsParametersAttribute"))
+                return IsRequestOnlyAggregate(parameter.Type);
+
             if (parameter.GetAttributes().Any(attribute =>
                 attribute.AttributeClass?.ToDisplayString() is
                     "Microsoft.AspNetCore.Mvc.FromRouteAttribute" or
@@ -273,10 +273,44 @@ namespace Dotnetarium.Config
 
             // Simple parameters are inferred from the route, query, header, or form.
             // Complex parameters can also be DI services, so require explicit binding.
-            var type = parameter.Type;
-            return type.SpecialType is not SpecialType.None and not SpecialType.System_Object ||
-                type.TypeKind == TypeKind.Enum;
+            return IsSimpleRequestType(parameter.Type);
         }
+
+        private static bool IsRequestOnlyAggregate(ITypeSymbol type)
+        {
+            if (type is not INamedTypeSymbol aggregate)
+                return false;
+
+            // A mixed aggregate can contain injected services. Marking its whole
+            // parameter tainted would incorrectly taint those service members.
+            var members = aggregate.GetMembers().Where(member =>
+                member.DeclaredAccessibility == Accessibility.Public &&
+                member is (IPropertySymbol { IsStatic: false, IsIndexer: false } or
+                    IFieldSymbol { IsStatic: false })).ToArray();
+            return members.Length > 0 && members.All(member =>
+                !HasAttribute(member, "Microsoft.AspNetCore.Mvc.FromServicesAttribute") &&
+                (HasRequestBindingAttribute(member) || member switch
+                {
+                    IPropertySymbol property => IsSimpleRequestType(property.Type),
+                    IFieldSymbol field => IsSimpleRequestType(field.Type),
+                    _ => false
+                }));
+        }
+
+        private static bool IsSimpleRequestType(ITypeSymbol type) =>
+            type.SpecialType is not SpecialType.None and not SpecialType.System_Object ||
+            type.TypeKind == TypeKind.Enum;
+
+        private static bool HasRequestBindingAttribute(ISymbol symbol) =>
+            symbol.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() is
+                "Microsoft.AspNetCore.Mvc.FromRouteAttribute" or
+                "Microsoft.AspNetCore.Mvc.FromQueryAttribute" or
+                "Microsoft.AspNetCore.Mvc.FromHeaderAttribute" or
+                "Microsoft.AspNetCore.Mvc.FromBodyAttribute" or
+                "Microsoft.AspNetCore.Mvc.FromFormAttribute");
+
+        private static bool HasAttribute(ISymbol symbol, string name) =>
+            symbol.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == name);
 
         private ImmutableHashSet<IMethodSymbol> FindMinimalApiHandlers()
         {

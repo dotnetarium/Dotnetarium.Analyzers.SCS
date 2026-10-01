@@ -37,8 +37,8 @@ This review covers the built-in C# rules and models on the 2.x crypto branch. It
 
 ## Verified limits
 
-- A redirect guarded by a successful `IsLocalUrl` check can still be reported; treating an ignored check as safe would create a false negative. `LocalRedirect` is the high-confidence alternative.
-- Minimal API complex parameters without explicit binding and `[AsParameters]` aggregates are not assumed to be request data because they can include injected services.
+- A redirect guarded by `IUrlHelper.IsLocalUrl` or `RedirectHttpResult.IsLocalUrl` is allowed when the same local or parameter is passed directly to a redirect in the check's only successful-branch statement. Ignored checks, changed values, and unrelated branches still report. `LocalRedirect` remains a safe alternative.
+- Minimal API `[AsParameters]` aggregates whose public instance members are all request-bound are modeled as input. Mixed aggregates with injected or ambiguous complex members are excluded until member-level binding can be tracked without tainting services. Unannotated complex handler parameters remain ambiguous because dependency injection may supply them.
 - The path and SSRF rules report untrusted input reaching a sensitive API. They do not prove a path escapes a root or that a relative HTTP URI controls the host.
 - The literal-key rules cannot identify all secrets assembled through helpers, fields, or configuration.
 

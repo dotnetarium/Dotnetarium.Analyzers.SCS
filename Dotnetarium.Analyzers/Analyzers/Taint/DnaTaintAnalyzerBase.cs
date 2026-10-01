@@ -110,6 +110,10 @@ namespace Dotnetarium.Analyzers.Taint
                     if (!pair.SinkKinds.Contains(kind))
                         continue;
 
+                    if (kind == (SinkKind)(int)TaintType.OpenRedirect &&
+                        LocalRedirectGuard.Protects(pair.Sink.Location, block.Compilation))
+                        continue;
+
                     foreach (var origin in pair.SourceOrigins)
                     {
                         var locations = settings.TaintFlowVisualizationEnabled
