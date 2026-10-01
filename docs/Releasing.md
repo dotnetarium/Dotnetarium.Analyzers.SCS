@@ -35,8 +35,7 @@ source of truth is `main`. Both packages use the same version.
    bypass as described above. The publishing job obtains a short-lived NuGet
    credential, publishes both packages, and adds
    the `.nupkg` files to the GitHub release. Verify both package pages and a
-   fresh `dotnet tool install --global dotnetarium` after indexing. After the
-   first 2.x publication, remove the pending-release note from the root README.
+   fresh `dotnet tool install --global dotnetarium` after indexing.
 5. After the new packages are available, deprecate the 1.x package IDs on
    NuGet.org as legacy and point each one to its 2.x replacement. Leave the
    old packages listed so existing consumers can still find them.

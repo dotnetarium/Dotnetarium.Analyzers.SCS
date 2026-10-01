@@ -6,8 +6,6 @@ Use the **NuGet analyzer** to see findings during a build, or the **global tool*
 
 It checks injection paths through SQL, commands, HTML, file paths, redirects, LDAP, XPath, outbound requests, and dynamic code. It also checks unsafe deserialization, hardcoded secrets, and cookie settings. See the [rule notes](docs/rules) for coverage and limitations, including [Razor and Blazor](docs/razor-blazor-taint.md).
 
-> **2.x release status:** The new package IDs are not on NuGet.org yet. The install commands below will work after the first 2.x release. You can [run the tool from source](#run-from-source) now.
-
 ## Install
 
 Add the analyzer to each C# project you want checked:
