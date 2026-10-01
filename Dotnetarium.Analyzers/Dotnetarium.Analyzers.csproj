@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <MicrosoftCodeAnalysisVersion>5.0.0</MicrosoftCodeAnalysisVersion>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Dotnetarium.Analyzers</PackageId>
+    <PackageVersion>2.0.0-alpha.1</PackageVersion>
+    <Authors>Dmitry Balikhin</Authors>
+    <PackageProjectUrl>https://github.com/dotnetarium/dotnetarium</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <RepositoryUrl>https://github.com/dotnetarium/dotnetarium</RepositoryUrl>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Description>Security analysis for modern C# with configurable taint models</Description>
+    <PackageReleaseNotes>Check details here: https://github.com/dotnetarium/dotnetarium/releases</PackageReleaseNotes>
+    <Copyright>© Dotnetarium</Copyright>
+    <PackageTags>Dotnetarium Security StaticAnalysis Roslyn CSharp TaintAnalysis SARIF</PackageTags>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Readme>README.md</Readme>
+
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_AddAnalyzersToOutput</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <AssemblyName>Dotnetarium.Analyzers</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dotnetarium.Analyzers.Tests" />
+    <InternalsVisibleTo Include="Dotnetarium.Tool" />
+    <InternalsVisibleTo Include="ModernSinkSmoke" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <None Remove="Config\Main.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Config\Main.json" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
+    <PackageReference Include="System.Text.Json" Version="10.0.12" />
+    <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD_PARTY_NOTICES.md" Pack="true" PackagePath="\" />
+    <None Include="..\Roslyn\License.txt" Pack="true" PackagePath="roslyn" />
+    <None Include="..\icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <Import Project="..\Roslyn\Compiler\Analyzer.Utilities.projitems" Label="Shared" />
+
+  <Import Project="..\Roslyn\FlowAnalysis\FlowAnalysis.Utilities.projitems" Label="Shared" />
+
+  <Import Project="..\Roslyn\Workspaces\Workspaces.Utilities.projitems" Label="Shared" />
+
+  <Target Name="_AddAnalyzersToOutput">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(OutputPath)\Dotnetarium.Analyzers.dll" PackagePath="analyzers/dotnet" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\System.Text.Json.dll" PackagePath="analyzers/dotnet" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\Microsoft.Bcl.AsyncInterfaces.dll;$(OutputPath)\System.Buffers.dll;$(OutputPath)\System.IO.Pipelines.dll;$(OutputPath)\System.Memory.dll;$(OutputPath)\System.Numerics.Vectors.dll;$(OutputPath)\System.Runtime.CompilerServices.Unsafe.dll;$(OutputPath)\System.Text.Encodings.Web.dll;$(OutputPath)\System.Threading.Tasks.Extensions.dll" PackagePath="analyzers/dotnet" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\Dotnetarium.Analyzers.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\System.Text.Json.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\Microsoft.Bcl.AsyncInterfaces.dll;$(OutputPath)\System.Buffers.dll;$(OutputPath)\System.IO.Pipelines.dll;$(OutputPath)\System.Memory.dll;$(OutputPath)\System.Numerics.Vectors.dll;$(OutputPath)\System.Runtime.CompilerServices.Unsafe.dll;$(OutputPath)\System.Text.Encodings.Web.dll;$(OutputPath)\System.Threading.Tasks.Extensions.dll" PackagePath="lib/netstandard2.0" />
+    </ItemGroup>
+  </Target>
+</Project>

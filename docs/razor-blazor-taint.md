@@ -1,0 +1,26 @@
+# Razor and Blazor taint analysis
+
+The analyzer follows browser-controlled values to raw HTML output in Razor
+Pages and components. It analyzes the Razor SDK's generated C# and maps
+diagnostics back to `.cshtml` and `.razor` through Razor's line directives.
+
+| Execution mode | Input modeled here | Raw-output sinks |
+| --- | --- | --- |
+| Razor Pages | Handler parameters and `[BindProperty]` | `Html.Raw`, `HtmlString`, `IHtmlContentBuilder.AppendHtml(string)` |
+| Static server rendering | Query, form, and matching route parameters | Rendered `MarkupString`, `AddMarkupContent` |
+| Interactive Server | Query and route parameters; form input when server bound | Same raw-output sinks |
+| Interactive WebAssembly with prerendering | Query and route parameters; server-bound form input during prerendering | Same raw-output sinks |
+| Interactive Auto | Both server and browser paths are possible | Same raw-output sinks |
+| Interactive WebAssembly with `prerender: false` | Query and route parameters; form binding is excluded | Same raw-output sinks |
+
+Only the XSS rule consumes the new component input sources. A WebAssembly
+assembly can be prerendered on the server, so assembly type alone cannot
+justify either server-only findings or server-only suppressions. Additional
+Blazor rules for server sinks will need a project and render-mode execution
+context. The analyzer currently excludes server form provenance only when a
+component explicitly declares WebAssembly rendering with `prerender: false`.
+
+Ordinary string rendering through Razor or `AddContent(string)` is encoded.
+A plain `[Parameter]` is not a source unless its name appears in the
+component's route template. Taint from parent components to child parameters
+and from browser event callbacks into later renders is not yet modeled.

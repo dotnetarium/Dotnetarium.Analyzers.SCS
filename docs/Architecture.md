@@ -1,0 +1,41 @@
+# Architecture
+
+The analyzer package and the global tool share the same rule catalog and taint engine.
+The analyzer targets `netstandard2.0` so Roslyn can load it during a build. The
+.NET 10 tool loads C# projects through MSBuild, runs the same analyzers, and can
+write SARIF 2.1.0. The tool supports projects targeting .NET 8 or .NET 10.
+
+## Taint models
+
+`Dotnetarium.Analyzers/Config/Main.json` contains the built-in source, sink,
+sanitizer, and transfer models. Projects can extend those models with a
+`Dotnetarium.json` additional file; the tool accepts it with `--config`.
+The JSON schema and examples are in [RuleConfiguration.md](RuleConfiguration.md).
+Public diagnostics use sequential `DNA` IDs. CWE numbers are metadata.
+
+## Flow engine
+
+The `Roslyn/` directory holds the selected upstream analyzer utilities used
+by the engine, including interprocedural flow analysis. Dotnetarium's own
+taint visitor, DI registration narrowing, rules, and diagnostic reporting
+remain in this repository. The separate `dotnetarium/analyzers` repository is
+reference material and is not a runtime dependency.
+
+The engine attaches source-to-sink witnesses to diagnostics. The tool emits
+complete witnesses as SARIF `codeFlows` and retains `relatedLocations` for
+consumers that use them. Paths are relative to the scanned project or solution
+by default.
+
+Interface dispatch considers implementations present in the source. For
+constructor-injected ASP.NET Core controllers, unambiguous built-in
+`IServiceCollection` registrations can narrow the targets. Factories,
+conditional registrations, and unknown container behavior keep a wider set of
+possible targets; the analyzer does not execute dependency injection.
+
+## Verification
+
+`Dotnetarium.Analyzers.Tests/` contains xUnit tests for rules and model
+coverage. `tests/ModernSinkSmoke/` checks real provider APIs,
+`tests/RazorSmoke/` checks Razor and Blazor cases, and `tests/CliSmoke/`
+installs both packed NuGet packages and scans .NET 8 and .NET 10 fixtures.
+The build workflow runs these checks on Windows.

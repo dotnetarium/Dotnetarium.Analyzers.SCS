@@ -1,0 +1,7 @@
+@page "/route-probe/{Slug}"
+@((MarkupString)(Slug ?? ""))
+@((MarkupString)(ParentOnly ?? ""))
+@code {
+    [Parameter] public string? Slug { get; set; }
+    [Parameter] public string? ParentOnly { get; set; }
+}

@@ -46,11 +46,19 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             ImmutableHashSet<(MethodMatcher, ImmutableHashSet<(string, string)>)> transferMethods,
             bool taintConstantArray,
             ArrayLengthMatcher? constantArrayLengthMatcher,
-            ImmutableArray<string>? dependencyFullTypeNames = null)
+            ImmutableArray<string>? dependencyFullTypeNames = null,
+            ImmutableHashSet<string>? taintedPropertyAttributes = null,
+            bool preserveTaintOnConversion = false,
+            bool taintRoutedParameters = false,
+            ImmutableHashSet<string>? serverBoundPropertyAttributes = null)
         {
             FullTypeName = fullTypeName ?? throw new ArgumentNullException(nameof(fullTypeName));
             IsInterface = isInterface;
             TaintedProperties = taintedProperties ?? throw new ArgumentNullException(nameof(taintedProperties));
+            TaintedPropertyAttributes = taintedPropertyAttributes ?? ImmutableHashSet<string>.Empty;
+            PreserveTaintOnConversion = preserveTaintOnConversion;
+            TaintRoutedParameters = taintRoutedParameters;
+            ServerBoundPropertyAttributes = serverBoundPropertyAttributes ?? ImmutableHashSet<string>.Empty;
             TaintedArguments = taintedArguments ?? throw new ArgumentNullException(nameof(taintedArguments));
             TaintedMethods = taintedMethods ?? throw new ArgumentNullException(nameof(taintedMethods));
             TaintedMethodsNeedsPointsToAnalysis = taintedMethodsNeedsPointsToAnalysis ?? throw new ArgumentNullException(nameof(taintedMethodsNeedsPointsToAnalysis));
@@ -82,6 +90,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             FullTypeName = fullTypeName ?? throw new ArgumentNullException(nameof(fullTypeName));
             IsInterface = isInterface;
             TaintedProperties = ImmutableHashSet<string>.Empty;
+            TaintedPropertyAttributes = ImmutableHashSet<string>.Empty;
+            PreserveTaintOnConversion = false;
+            TaintRoutedParameters = false;
+            ServerBoundPropertyAttributes = ImmutableHashSet<string>.Empty;
             TaintedArguments = ImmutableHashSet<ParameterMatcher>.Empty;
             TaintedMethods = taintedMethods ?? throw new ArgumentNullException(nameof(taintedMethods));
             TaintedMethodsNeedsPointsToAnalysis = taintedMethodsNeedsPointsToAnalysis ?? throw new ArgumentNullException(nameof(taintedMethodsNeedsPointsToAnalysis));
@@ -122,6 +134,18 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         /// Properties that generate tainted data.
         /// </summary>
         public ImmutableHashSet<string> TaintedProperties { get; }
+
+        /// <summary>Attributes that identify framework-bound input properties.</summary>
+        public ImmutableHashSet<string> TaintedPropertyAttributes { get; }
+
+        /// <summary>Whether a user-defined conversion on this type preserves its input value.</summary>
+        public bool PreserveTaintOnConversion { get; }
+
+        /// <summary>Whether route-bound component parameters are input sources.</summary>
+        public bool TaintRoutedParameters { get; }
+
+        /// <summary>Properties bound during server rendering, except in explicitly client-only components.</summary>
+        public ImmutableHashSet<string> ServerBoundPropertyAttributes { get; }
 
         /// <summary>
         /// Methods that generate tainted data.
@@ -231,6 +255,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             hashCode.Add(this.IsInterface.GetHashCode());
             HashUtilities.Combine(this.TransferProperties, ref hashCode);
             HashUtilities.Combine(this.TaintedProperties, ref hashCode);
+            HashUtilities.Combine(this.TaintedPropertyAttributes, ref hashCode);
+            hashCode.Add(this.PreserveTaintOnConversion.GetHashCode());
+            hashCode.Add(this.TaintRoutedParameters.GetHashCode());
+            HashUtilities.Combine(this.ServerBoundPropertyAttributes, ref hashCode);
             HashUtilities.Combine(this.TaintedMethods, ref hashCode);
             HashUtilities.Combine(this.TaintedArguments, ref hashCode);
             HashUtilities.Combine(this.TaintedMethodsNeedsPointsToAnalysis, ref hashCode);
@@ -256,6 +284,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 && this.IsInterface == other.IsInterface
                 && this.TransferProperties == other.TransferProperties
                 && this.TaintedProperties == other.TaintedProperties
+                && this.TaintedPropertyAttributes == other.TaintedPropertyAttributes
+                && this.PreserveTaintOnConversion == other.PreserveTaintOnConversion
+                && this.TaintRoutedParameters == other.TaintRoutedParameters
+                && this.ServerBoundPropertyAttributes == other.ServerBoundPropertyAttributes
                 && this.TaintedMethods == other.TaintedMethods
                 && this.TaintedArguments == other.TaintedArguments
                 && this.TaintedMethodsNeedsPointsToAnalysis == other.TaintedMethodsNeedsPointsToAnalysis

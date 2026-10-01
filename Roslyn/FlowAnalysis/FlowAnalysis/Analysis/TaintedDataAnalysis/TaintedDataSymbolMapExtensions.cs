@@ -5,9 +5,12 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Analyzer.Utilities.Extensions;
 using Analyzer.Utilities.PooledObjects;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.PointsToAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis;
@@ -143,6 +146,72 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 if (sourceInfo.TaintedProperties.Contains(propertySymbol.MetadataName))
                 {
                     return true;
+                }
+
+                if (!sourceInfo.TaintedPropertyAttributes.IsEmpty
+                    && propertySymbol.GetAttributes().Any(attribute =>
+                        attribute.AttributeClass != null
+                        && sourceInfo.TaintedPropertyAttributes.Contains(attribute.AttributeClass.ToDisplayString())))
+                {
+                    return true;
+                }
+
+                if (!sourceInfo.ServerBoundPropertyAttributes.IsEmpty
+                    && !IsExplicitClientOnlyComponent(propertySymbol.ContainingType)
+                    && propertySymbol.GetAttributes().Any(attribute =>
+                        attribute.AttributeClass != null
+                        && sourceInfo.ServerBoundPropertyAttributes.Contains(attribute.AttributeClass.ToDisplayString())))
+                {
+                    return true;
+                }
+
+                if (sourceInfo.TaintRoutedParameters && IsRoutedComponentParameter(propertySymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsRoutedComponentParameter(IPropertySymbol propertySymbol)
+        {
+            if (!propertySymbol.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "Microsoft.AspNetCore.Components.ParameterAttribute"))
+            {
+                return false;
+            }
+
+            string routeParameter = @"\{(?:\*\*?)?" + Regex.Escape(propertySymbol.Name) + @"(?=[:}?])";
+            return propertySymbol.ContainingType.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "Microsoft.AspNetCore.Components.RouteAttribute"
+                && attribute.ConstructorArguments.Length > 0
+                && attribute.ConstructorArguments[0].Value is string template
+                && Regex.IsMatch(template, routeParameter, RegexOptions.IgnoreCase));
+        }
+
+        private static bool IsExplicitClientOnlyComponent(INamedTypeSymbol componentType)
+        {
+            // A component-level WebAssembly mode with prerender:false has no
+            // server form binding. Auto and prerendered WebAssembly remain mixed.
+            foreach (INamedTypeSymbol renderMode in componentType.GetTypeMembers("__PrivateComponentRenderModeAttribute"))
+            {
+                foreach (SyntaxReference reference in renderMode.DeclaringSyntaxReferences)
+                {
+                    foreach (ObjectCreationExpressionSyntax creation in reference.GetSyntax().DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+                    {
+                        if (!creation.Type.ToString().EndsWith("InteractiveWebAssemblyRenderMode", StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        if (creation.ArgumentList?.Arguments.Any(arg =>
+                            (arg.NameColon == null || arg.NameColon.Name.Identifier.ValueText == "prerender")
+                            && arg.Expression.IsKind(SyntaxKind.FalseLiteralExpression)) == true)
+                        {
+                            return true;
+                        }
+                    }
                 }
             }
 

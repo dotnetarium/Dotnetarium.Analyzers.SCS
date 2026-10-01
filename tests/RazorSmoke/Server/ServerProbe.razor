@@ -1,0 +1,8 @@
+@page "/server-probe"
+@rendermode InteractiveServer
+@((MarkupString)(Query ?? ""))
+@((MarkupString)(FormValue ?? ""))
+@code {
+    [SupplyParameterFromQuery] private string? Query { get; set; }
+    [SupplyParameterFromForm] private string? FormValue { get; set; }
+}

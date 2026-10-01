@@ -1,0 +1,16 @@
+@page
+@model RazorSmoke.Server.Pages.RawPageModel
+@Html.Raw(Model.Bound)
+@(new Microsoft.AspNetCore.Html.HtmlString(Model.Bound))
+@Html.Raw(Model.ParentOnly)
+@(new Microsoft.AspNetCore.Html.HtmlString(Model.ParentOnly))
+@{
+    Microsoft.AspNetCore.Html.IHtmlContentBuilder content = new Microsoft.AspNetCore.Html.HtmlContentBuilder();
+    content.AppendHtml(Model.Bound);
+    content.Append(Model.Bound);
+    content.AppendHtml(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(Model.Bound));
+    var concrete = new Microsoft.AspNetCore.Html.HtmlContentBuilder();
+    concrete.AppendHtml(Model.Bound);
+}
+@content
+@concrete

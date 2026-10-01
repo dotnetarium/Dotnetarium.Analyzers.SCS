@@ -306,8 +306,20 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                     return operandValue;
                 }
 
-                // Conservative for error code and user defined operator.
-                return !operation.Conversion.IsUserDefined ? operandValue : ValueDomain.UnknownOrMayBeValue;
+                if (operation.Conversion.IsUserDefined)
+                {
+                    // Only model conversions explicitly known to preserve their input.
+                    if (operation.OperatorMethod?.ContainingType is INamedTypeSymbol conversionType
+                        && this.DataFlowAnalysisContext.SourceInfos.GetInfosForType(conversionType)
+                            .Any(info => info.PreserveTaintOnConversion))
+                    {
+                        return operandValue;
+                    }
+
+                    return ValueDomain.UnknownOrMayBeValue;
+                }
+
+                return operandValue;
             }
 
             protected override TaintedDataAbstractValue ComputeAnalysisValueForReferenceOperation(IOperation operation, TaintedDataAbstractValue defaultValue)
