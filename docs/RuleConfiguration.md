@@ -30,9 +30,9 @@ The file must declare `"Version": "2.0"`. JSON property names are case insensiti
   ],
   "Sanitizers": [
     {
-      "Type": "Example.SqlEscaping",
-      "TaintTypes": ["SqlInjection"],
-      "Methods": [{ "Name": "Escape" }]
+      "Type": "Example.LdapEscaping",
+      "TaintTypes": ["LdapFilterInjection"],
+      "Methods": [{ "Name": "EncodeFilter" }]
     }
   ]
 }
@@ -43,3 +43,5 @@ The file must declare `"Version": "2.0"`. JSON property names are case insensiti
 Project models add to the built-ins. Configure severity and suppression with `.editorconfig` using `dotnet_diagnostic.DNAxxxx.severity`. A rule ID does not appear in `dotnetarium.json` because the analyzer maps internal contexts to DNA diagnostics.
 
 Configuration cannot express arbitrary code flow or whole-application dependency injection resolution. Review findings involving reflection, runtime registrations, and external assemblies with the appropriate deployment context.
+
+Built-in ASP.NET Core inputs include MVC controllers, Razor Pages, Blazor binding, and Minimal API lambdas or named handlers. Minimal API simple parameters and parameters explicitly marked `[FromRoute]`, `[FromQuery]`, `[FromHeader]`, `[FromBody]`, or `[FromForm]` are treated as request data. `[FromServices]` parameters are excluded; complex parameters without explicit binding and `[AsParameters]` aggregates are left for review rather than assumed to be request data, because service injection can use the same parameter shape.

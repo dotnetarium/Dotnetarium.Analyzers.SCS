@@ -7,6 +7,7 @@ using Analyzer.Utilities.Extensions;
 using Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using Dotnetarium.Config;
 
@@ -73,46 +74,63 @@ namespace Dotnetarium.Analyzers.Taint
             if (graph == null)
                 return;
 
-            var result = TaintedDataAnalysis.TryGetOrComputeResult(
-                graph,
-                block.Compilation,
-                block.OwningSymbol,
-                block.Options,
-                TaintedDataEnteringSinkDescriptor,
-                sources,
-                sanitizers,
-                sinks,
-                block.CancellationToken,
-                settings.MaxInterproceduralMethodCallChain,
-                settings.MaxInterproceduralLambdaOrLocalFunctionCallChain);
-            if (result == null)
-                return;
+            AnalyzeGraph(graph, block.OwningSymbol);
 
-            foreach (var pair in result.TaintedDataSourceSinks)
+            // Route handlers are stored as delegates. RegisterOperationBlockAction
+            // receives their containing method, but the parent CFG never invokes
+            // the handler, so analyze each request-bound lambda as its own CFG.
+            var types = WellKnownTypeProvider.GetOrCreate(block.Compilation);
+            foreach (var lambda in graph.DescendantOperations<IFlowAnonymousFunctionOperation>(
+                OperationKind.FlowAnonymousFunction))
             {
-                if (!pair.SinkKinds.Contains(kind))
+                if (!lambda.Symbol.Parameters.Any(parameter => sources.IsSourceParameter(parameter, types)))
                     continue;
+                AnalyzeGraph(graph.GetAnonymousFunctionControlFlowGraph(lambda), lambda.Symbol);
+            }
 
-                foreach (var origin in pair.SourceOrigins)
+            void AnalyzeGraph(Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph currentGraph, ISymbol owner)
+            {
+                var result = TaintedDataAnalysis.TryGetOrComputeResult(
+                    currentGraph,
+                    block.Compilation,
+                    owner,
+                    block.Options,
+                    TaintedDataEnteringSinkDescriptor,
+                    sources,
+                    sanitizers,
+                    sinks,
+                    block.CancellationToken,
+                    settings.MaxInterproceduralMethodCallChain,
+                    settings.MaxInterproceduralLambdaOrLocalFunctionCallChain);
+                if (result == null)
+                    return;
+
+                foreach (var pair in result.TaintedDataSourceSinks)
                 {
-                    var locations = settings.TaintFlowVisualizationEnabled
-                        ? result.GetFlowLocations(pair, origin).ToArray()
-                        : new[] { origin.Location };
-                    var properties = settings.TaintFlowVisualizationEnabled
-                        ? ImmutableDictionary<string, string>.Empty.Add("dotnetarium.flow", "true")
-                        : null;
-                    block.ReportDiagnostic(Diagnostic.Create(
-                        TaintedDataEnteringSinkDescriptor,
-                        pair.Sink.Location,
-                        additionalLocations: locations,
-                        properties: properties,
-                        messageArgs: new object[]
-                        {
-                            pair.Sink.Symbol.Name,
-                            pair.Sink.AccessingMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            origin.Symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                            origin.AccessingMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
-                        }));
+                    if (!pair.SinkKinds.Contains(kind))
+                        continue;
+
+                    foreach (var origin in pair.SourceOrigins)
+                    {
+                        var locations = settings.TaintFlowVisualizationEnabled
+                            ? result.GetFlowLocations(pair, origin).ToArray()
+                            : new[] { origin.Location };
+                        var properties = settings.TaintFlowVisualizationEnabled
+                            ? ImmutableDictionary<string, string>.Empty.Add("dotnetarium.flow", "true")
+                            : null;
+                        block.ReportDiagnostic(Diagnostic.Create(
+                            TaintedDataEnteringSinkDescriptor,
+                            pair.Sink.Location,
+                            additionalLocations: locations,
+                            properties: properties,
+                            messageArgs: new object[]
+                            {
+                                pair.Sink.Symbol.Name,
+                                pair.Sink.AccessingMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                                origin.Symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                                origin.AccessingMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+                            }));
+                    }
                 }
             }
         }

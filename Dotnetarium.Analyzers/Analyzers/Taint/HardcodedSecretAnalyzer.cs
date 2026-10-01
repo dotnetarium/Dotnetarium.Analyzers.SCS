@@ -69,7 +69,9 @@ namespace Dotnetarium.Analyzers.Taint
                 while (value is IConversionOperation conversion)
                     value = conversion.Operand;
                 if (value.ConstantValue.HasValue)
-                    return value.ConstantValue.Value is not null and not "";
+                    return value.ConstantValue.Value is string text
+                        ? !string.IsNullOrWhiteSpace(text) && !IsPlaceholder(text)
+                        : value.ConstantValue.Value != null;
                 if (value is IArrayCreationOperation array &&
                     (array.Initializer == null
                         ? array.DimensionSizes.All(size => size.ConstantValue.HasValue && size.ConstantValue.Value is int length && length > 0)
@@ -79,7 +81,9 @@ namespace Dotnetarium.Analyzers.Taint
                     return false;
                 var state = values.Value[value.Kind, value.Syntax];
                 return state.NonLiteralState == ValueContainsNonLiteralState.No &&
-                       state.LiteralValues.Any(literal => literal is not null and not "");
+                       state.LiteralValues.Any(literal => literal is string text
+                           ? !string.IsNullOrWhiteSpace(text) && !IsPlaceholder(text)
+                           : literal != null);
             }
 
             void Report(Location location, ISymbol symbol)
@@ -90,7 +94,12 @@ namespace Dotnetarium.Analyzers.Taint
                     DnaRuleCatalog.HardcodedSecret,
                     location,
                     additionalLocations: new[] { location },
-                    messageArgs: new object[] { symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat) }));
+                    messageArgs: new object[]
+                    {
+                        symbol.ContainingType.ToDisplayString() is "System.Net.NetworkCredential" or "System.UriBuilder"
+                            ? "credential" : "cryptographic key",
+                        symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+                    }));
             }
 
             foreach (var root in block.OperationBlocks)
@@ -131,6 +140,20 @@ namespace Dotnetarium.Analyzers.Taint
                         break;
                 }
             }
+        }
+
+        private static bool IsPlaceholder(string text)
+        {
+            var value = text.Trim();
+            return value.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase) ||
+                   value.StartsWith("REPLACE_", StringComparison.OrdinalIgnoreCase) ||
+                   value.Equals("CHANGE_ME", StringComparison.OrdinalIgnoreCase) ||
+                   (value.StartsWith("<", StringComparison.Ordinal) &&
+                    value.EndsWith(">", StringComparison.Ordinal) &&
+                    (value.IndexOf("password", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     value.IndexOf("secret", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     value.IndexOf("token", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     value.IndexOf("key", StringComparison.OrdinalIgnoreCase) >= 0));
         }
     }
 }

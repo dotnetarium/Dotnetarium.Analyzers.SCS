@@ -99,31 +99,31 @@ public sealed partial class SinkCoverageTests
         yield return P("System.UriBuilder", "DNA0009", "Password", "new System.UriBuilder().Password = \"secret\";");
         foreach (var member in new[] { "Key" })
             yield return P("System.Security.Cryptography.SymmetricAlgorithm", "DNA0009", member,
-                $"System.Security.Cryptography.Aes.Create().{member} = new byte[] {{ 1, 2, 3 }};");
-        yield return M("System.Security.Cryptography.AesGcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesGcm(new byte[] { 1, 2, 3 }, 16);");
-        yield return M("System.Security.Cryptography.AesCcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesCcm(new byte[] { 1, 2, 3 });");
-        yield return M("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[] { 1, 2, 3 });");
-        yield return M("Org.BouncyCastle.Crypto.Parameters.KeyParameter", "DNA0009", ".ctor", "_ = new Org.BouncyCastle.Crypto.Parameters.KeyParameter(new byte[] { 1, 2, 3 });");
-        yield return M("NSec.Cryptography.Key", "DNA0009", "Import", "_ = NSec.Cryptography.Key.Import(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[] { 1, 2, 3 }, NSec.Cryptography.KeyBlobFormat.RawSymmetricKey);");
-        yield return M("NSec.Cryptography.Key", "DNA0009", "TryImport", "_ = NSec.Cryptography.Key.TryImport(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[] { 1, 2, 3 }, NSec.Cryptography.KeyBlobFormat.RawSymmetricKey, out var importedKey);");
-        yield return M("Sodium.SecretBox", "DNA0009", "Create", "_ = Sodium.SecretBox.Create(new byte[1], new byte[24], new byte[] { 1, 2, 3 });");
-        yield return M("Sodium.SecretBox", "DNA0009", "CreateDetached", "_ = Sodium.SecretBox.CreateDetached(new byte[1], new byte[24], new byte[] { 1, 2, 3 });");
-        yield return M("Sodium.SecretBox", "DNA0009", "Open", "_ = Sodium.SecretBox.Open(new byte[1], new byte[24], new byte[] { 1, 2, 3 });");
-        yield return M("Sodium.SecretBox", "DNA0009", "OpenDetached", "_ = Sodium.SecretBox.OpenDetached(new byte[1], new byte[16], new byte[24], new byte[] { 1, 2, 3 });");
+                $"System.Security.Cryptography.Aes.Create().{member} = new byte[32];");
+        yield return M("System.Security.Cryptography.AesGcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesGcm(new byte[32], 16);");
+        yield return M("System.Security.Cryptography.AesCcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesCcm(new byte[32]);");
+        yield return M("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[32]);");
+        yield return M("Org.BouncyCastle.Crypto.Parameters.KeyParameter", "DNA0009", ".ctor", "_ = new Org.BouncyCastle.Crypto.Parameters.KeyParameter(new byte[32]);");
+        yield return M("NSec.Cryptography.Key", "DNA0009", "Import", "_ = NSec.Cryptography.Key.Import(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[32], NSec.Cryptography.KeyBlobFormat.RawSymmetricKey);");
+        yield return M("NSec.Cryptography.Key", "DNA0009", "TryImport", "_ = NSec.Cryptography.Key.TryImport(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[32], NSec.Cryptography.KeyBlobFormat.RawSymmetricKey, out var importedKey);");
+        yield return M("Sodium.SecretBox", "DNA0009", "Create", "_ = Sodium.SecretBox.Create(new byte[1], new byte[24], new byte[32]);");
+        yield return M("Sodium.SecretBox", "DNA0009", "CreateDetached", "_ = Sodium.SecretBox.CreateDetached(new byte[1], new byte[24], new byte[32]);");
+        yield return M("Sodium.SecretBox", "DNA0009", "Open", "_ = Sodium.SecretBox.Open(new byte[1], new byte[24], new byte[32]);");
+        yield return M("Sodium.SecretBox", "DNA0009", "OpenDetached", "_ = Sodium.SecretBox.OpenDetached(new byte[1], new byte[16], new byte[24], new byte[32]);");
         foreach (var (type, size) in new[]
         {
             ("SecretAeadAes", 12), ("SecretAeadChaCha20Poly1305", 8),
             ("SecretAeadChaCha20Poly1305IETF", 12), ("SecretAeadXChaCha20Poly1305", 24)
         })
             yield return M("Sodium." + type, "DNA0009", "Encrypt",
-                $"_ = Sodium.{type}.Encrypt(new byte[1], new byte[{size}], new byte[] {{ 1, 2, 3 }}, null);");
+                $"_ = Sodium.{type}.Encrypt(new byte[1], new byte[{size}], new byte[32], null);");
         foreach (var (type, size) in new[]
         {
             ("SecretAeadAes", 12), ("SecretAeadChaCha20Poly1305", 8),
             ("SecretAeadChaCha20Poly1305IETF", 12), ("SecretAeadXChaCha20Poly1305", 24)
         })
             yield return M("Sodium." + type, "DNA0009", "Decrypt",
-                $"_ = Sodium.{type}.Decrypt(new byte[1], new byte[{size}], new byte[] {{ 1, 2, 3 }}, null);");
+                $"_ = Sodium.{type}.Decrypt(new byte[1], new byte[{size}], new byte[32], null);");
 
         yield return M("System.Diagnostics.Process", "DNA0002", "Start", "_ = System.Diagnostics.Process.Start(input);");
         yield return new MemberProbe("System.Diagnostics.ProcessStartInfo", "DNA0002", "C", ".ctor", "_ = new System.Diagnostics.ProcessStartInfo(input);");
@@ -143,6 +143,8 @@ public sealed partial class SinkCoverageTests
         }
         yield return M("Microsoft.AspNetCore.Mvc.RedirectResult", "DNA0005", ".ctor", "_ = new Microsoft.AspNetCore.Mvc.RedirectResult(input);");
         yield return P("Microsoft.AspNetCore.Mvc.RedirectResult", "DNA0005", "Url", "new Microsoft.AspNetCore.Mvc.RedirectResult(\"fixed\").Url = input;");
+        yield return M("Microsoft.AspNetCore.Http.Results", "DNA0005", "Redirect", "_ = Microsoft.AspNetCore.Http.Results.Redirect(input);");
+        yield return M("Microsoft.AspNetCore.Http.TypedResults", "DNA0005", "Redirect", "_ = Microsoft.AspNetCore.Http.TypedResults.Redirect(input);");
 
         var directory = "System.IO.Directory";
         foreach (var member in new[] { "CreateDirectory", "Delete", "EnumerateDirectories", "EnumerateFiles", "EnumerateFileSystemEntries", "GetDirectories", "GetFiles", "GetFileSystemEntries" })
@@ -172,7 +174,6 @@ public sealed partial class SinkCoverageTests
         yield return M("System.IO.FileInfo", "DNA0004", "Replace", "_ = new System.IO.FileInfo(\"fixed\").Replace(input, \"backup\");");
         foreach (var member in new[] { "LoadFile", "LoadFrom", "UnsafeLoadFrom" })
             yield return M("System.Reflection.Assembly", "DNA0004", member, $"_ = System.Reflection.Assembly.{member}(input);");
-        yield return M("System.Xml.XmlReader", "DNA0004", "Create", "_ = System.Xml.XmlReader.Create(input);");
         yield return M("System.IO.StreamReader", "DNA0004", ".ctor", "_ = new System.IO.StreamReader(input);");
         yield return M("System.IO.StreamWriter", "DNA0004", ".ctor", "_ = new System.IO.StreamWriter(input);");
         yield return M("System.IO.FileStream", "DNA0004", ".ctor", "_ = new System.IO.FileStream(input, System.IO.FileMode.OpenOrCreate);");
@@ -205,6 +206,8 @@ public sealed partial class SinkCoverageTests
         foreach (var member in new[] { "Execute", "ExecuteAsync", "ExecuteReader", "ExecuteReaderAsync", "ExecuteScalar", "ExecuteScalarAsync", "Query", "QueryAsync", "QueryFirst", "QueryFirstAsync", "QueryFirstOrDefault", "QueryFirstOrDefaultAsync", "QueryMultiple", "QueryMultipleAsync", "QuerySingle", "QuerySingleAsync", "QuerySingleOrDefault", "QuerySingleOrDefaultAsync", "QueryUnbufferedAsync" })
             yield return M("Dapper.SqlMapper", "DNA0001", member, $"_ = Dapper.SqlMapper.{member}(null!, input);");
         yield return M("Npgsql.NpgsqlCommand", "DNA0001", ".ctor", "_ = new Npgsql.NpgsqlCommand(input);");
+        yield return M("Microsoft.Data.SqlClient.SqlCommand", "DNA0001", ".ctor", "_ = new Microsoft.Data.SqlClient.SqlCommand(input);");
+        yield return M("MySqlConnector.MySqlCommand", "DNA0001", ".ctor", "_ = new MySqlConnector.MySqlCommand(input);");
         yield return M("Npgsql.NpgsqlBatchCommand", "DNA0001", ".ctor", "_ = new Npgsql.NpgsqlBatchCommand(input);");
         yield return P("Npgsql.NpgsqlBatchCommand", "DNA0001", "CommandText", "new Npgsql.NpgsqlBatchCommand(\"fixed\").CommandText = input;");
         yield return M("Npgsql.NpgsqlDataSource", "DNA0001", "CreateCommand", "_ = Npgsql.NpgsqlDataSource.Create(\"Host=localhost\").CreateCommand(input);");
@@ -224,6 +227,7 @@ public sealed partial class SinkCoverageTests
         foreach (var member in new[] { "PostAsync", "PutAsync", "PatchAsync" })
             yield return M("System.Net.Http.HttpClient", "DNA0011", member, $"_ = new System.Net.Http.HttpClient().{member}(input, new System.Net.Http.StringContent(\"body\"));");
         yield return M("System.Net.Http.HttpRequestMessage", "DNA0011", ".ctor", "_ = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, input);");
+        yield return P("System.Net.Http.HttpRequestMessage", "DNA0011", "RequestUri", "new System.Net.Http.HttpRequestMessage().RequestUri = new System.Uri(input);");
         foreach (var member in new[] { "EvaluateAsync", "RunAsync" })
             yield return M("Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript", "DNA0012", member, $"_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.{member}(input);");
     }

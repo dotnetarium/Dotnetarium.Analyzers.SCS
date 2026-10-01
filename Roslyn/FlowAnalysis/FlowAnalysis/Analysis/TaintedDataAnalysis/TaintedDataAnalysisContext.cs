@@ -105,6 +105,19 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             DataFlowAnalysisResult<ValueContentBlockAnalysisResult, ValueContentAbstractValue>? valueContentAnalysisResult,
             InterproceduralTaintedDataAnalysisData? interproceduralAnalysisData)
         {
+            // Some calls have no cached interprocedural points-to result when taint
+            // analysis does not also request value-content analysis. The child
+            // context still needs points-to state to track its parameter entities.
+            pointsToAnalysisResult ??= PointsToAnalysis.TryGetOrComputeResult(
+                invokedCfg,
+                invokedMethod,
+                this.AnalyzerOptions,
+                this.WellKnownTypeProvider,
+                PointsToAnalysisKind.Complete,
+                this.InterproceduralAnalysisConfiguration,
+                interproceduralAnalysisPredicate: null,
+                pessimisticAnalysis: true,
+                performCopyAnalysis: false);
             return new TaintedDataAnalysisContext(
                 this.ValueDomain,
                 this.WellKnownTypeProvider,

@@ -14,7 +14,6 @@ namespace Dotnetarium.Analyzers.Taint
         PathEscape,
         LdapDnInjection,
         OpenRedirect,
-        UnsafeDeserialization,
         CrossSiteScripting,
         LdapFilterInjection,
         ServerSideRequestForgery,
@@ -74,13 +73,6 @@ namespace Dotnetarium.Analyzers.Taint
     {
         protected override SinkKind SinkKind => (SinkKind)(int)TaintType.XPathInjection;
         protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor => DnaRuleCatalog.XPathInjection;
-    }
-
-    [DiagnosticAnalyzer(LanguageNames.CSharp)]
-    public sealed class DeserializationTaintAnalyzer : TaintAnalyzer
-    {
-        protected override SinkKind SinkKind => (SinkKind)(int)TaintType.UnsafeDeserialization;
-        protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor => DnaRuleCatalog.UnsafeDeserialization;
     }
 
     [DiagnosticAnalyzer(LanguageNames.CSharp)]

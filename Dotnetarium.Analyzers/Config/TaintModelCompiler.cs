@@ -8,6 +8,7 @@ using Analyzer.Utilities.Extensions;
 using Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis;
 using Analyzer.Utilities.PooledObjects;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.FlowAnalysis.DataFlow.ValueContentAnalysis;
 using Microsoft.CodeAnalysis.Operations;
@@ -44,6 +45,8 @@ namespace Dotnetarium.Config
     internal sealed class TaintConfiguration
     {
         private readonly ConfigData model;
+        private readonly Compilation compilation;
+        private readonly Lazy<ImmutableHashSet<IMethodSymbol>> minimalApiHandlers;
         private readonly WellKnownTypeProvider types;
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SourceInfo>> sourceMaps = new();
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SanitizerInfo>> sanitizerMaps = new();
@@ -52,6 +55,8 @@ namespace Dotnetarium.Config
         public TaintConfiguration(ConfigData model, Compilation compilation)
         {
             this.model = model;
+            this.compilation = compilation;
+            minimalApiHandlers = new Lazy<ImmutableHashSet<IMethodSymbol>>(FindMinimalApiHandlers);
             types = WellKnownTypeProvider.GetOrCreate(compilation);
         }
 
@@ -169,11 +174,13 @@ namespace Dotnetarium.Config
             return compiled.ToImmutable();
         }
 
-        private static bool IsInputParameter(
+        private bool IsInputParameter(
             IParameterSymbol parameter,
             WellKnownTypeProvider provider,
             TaintEntryPointData entry)
         {
+            if (IsMinimalApiInputParameter(parameter, compilation))
+                return true;
             if (parameter.ContainingSymbol is not IMethodSymbol method ||
                 method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet)
                 return false;
@@ -234,6 +241,67 @@ namespace Dotnetarium.Config
 
             return !HasAnyParameterAttribute(parameter, provider, entry.Parameter?.Attributes?.Exclude);
         }
+
+        private bool IsMinimalApiInputParameter(IParameterSymbol parameter, Compilation compilation)
+        {
+            if (parameter.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() is
+                    "Microsoft.AspNetCore.Mvc.FromServicesAttribute" or
+                    "Microsoft.AspNetCore.Http.AsParametersAttribute"))
+                return false;
+
+            var syntax = parameter.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            var lambda = syntax?.AncestorsAndSelf().OfType<LambdaExpressionSyntax>().FirstOrDefault();
+            var argument = lambda?.Ancestors().OfType<ArgumentSyntax>().FirstOrDefault();
+            var isLambdaHandler = argument?.Parent?.Parent is InvocationExpressionSyntax invocation &&
+                argument == invocation.ArgumentList.Arguments.LastOrDefault() &&
+                IsMinimalApiMapMethod(compilation.GetSemanticModel(invocation.SyntaxTree)
+                    .GetSymbolInfo(invocation).Symbol as IMethodSymbol);
+            var isNamedHandler = parameter.ContainingSymbol is IMethodSymbol owner &&
+                minimalApiHandlers.Value.Contains(owner);
+            if (!isLambdaHandler && !isNamedHandler)
+                return false;
+
+            if (parameter.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() is
+                    "Microsoft.AspNetCore.Mvc.FromRouteAttribute" or
+                    "Microsoft.AspNetCore.Mvc.FromQueryAttribute" or
+                    "Microsoft.AspNetCore.Mvc.FromHeaderAttribute" or
+                    "Microsoft.AspNetCore.Mvc.FromBodyAttribute" or
+                    "Microsoft.AspNetCore.Mvc.FromFormAttribute"))
+                return true;
+
+            // Simple parameters are inferred from the route, query, header, or form.
+            // Complex parameters can also be DI services, so require explicit binding.
+            var type = parameter.Type;
+            return type.SpecialType is not SpecialType.None and not SpecialType.System_Object ||
+                type.TypeKind == TypeKind.Enum;
+        }
+
+        private ImmutableHashSet<IMethodSymbol> FindMinimalApiHandlers()
+        {
+            var handlers = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                var model = compilation.GetSemanticModel(tree);
+                foreach (var invocation in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
+                {
+                    if (!IsMinimalApiMapMethod(model.GetSymbolInfo(invocation).Symbol as IMethodSymbol) ||
+                        invocation.ArgumentList.Arguments.LastOrDefault() is not { } handlerArgument)
+                        continue;
+                    var binding = model.GetSymbolInfo(handlerArgument.Expression);
+                    if ((binding.Symbol as IMethodSymbol ?? binding.CandidateSymbols.OfType<IMethodSymbol>().SingleOrDefault())
+                        is { } handler)
+                        handlers.Add(handler);
+                }
+            }
+            return handlers.ToImmutable();
+        }
+
+        private static bool IsMinimalApiMapMethod(IMethodSymbol? method) =>
+            method != null && method.ContainingNamespace.ToDisplayString() == "Microsoft.AspNetCore.Builder" &&
+            method.Name is "Map" or "MapGet" or "MapPost" or "MapPut" or "MapDelete" or
+                "MapPatch" or "MapMethods" or "MapFallback";
 
         private static bool HasAnyTypeAttribute(
             INamedTypeSymbol symbol,

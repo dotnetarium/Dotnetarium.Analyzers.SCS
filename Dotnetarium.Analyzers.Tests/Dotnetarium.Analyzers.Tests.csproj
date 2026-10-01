@@ -12,6 +12,8 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.3" />
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageReference Include="NSec.Cryptography" Version="26.4.0" />
     <PackageReference Include="Sodium.Core" Version="1.4.1" />

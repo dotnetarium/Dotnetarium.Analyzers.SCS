@@ -9,18 +9,17 @@ namespace Dotnetarium.Analyzers
         public static readonly DiagnosticDescriptor SqlInjection = Taint("DNA0001", "SQL injection", 89);
         public static readonly DiagnosticDescriptor CommandInjection = Taint("DNA0002", "OS command injection", 78);
         public static readonly DiagnosticDescriptor CrossSiteScripting = Taint("DNA0003", "Cross-site scripting", 79);
-        public static readonly DiagnosticDescriptor PathEscape = Taint("DNA0004", "Path escape", 22);
+        public static readonly DiagnosticDescriptor PathEscape = Taint("DNA0004", "Untrusted file path", 22);
         public static readonly DiagnosticDescriptor OpenRedirect = Taint("DNA0005", "Open redirect", 601);
         public static readonly DiagnosticDescriptor LdapInjection = Taint("DNA0006", "LDAP injection", 90);
         public static readonly DiagnosticDescriptor XPathInjection = Taint("DNA0007", "XPath injection", 643);
-        public static readonly DiagnosticDescriptor UnsafeDeserialization = Taint("DNA0008", "Unsafe deserialization", 502);
-        public static readonly DiagnosticDescriptor UnsafeDeserializationSetting = Create("DNA0008", "Unsafe deserialization", "Json.NET TypeNameHandling value '{0}' can materialize untrusted types.", 502);
-        public static readonly DiagnosticDescriptor HardcodedSecret = Create("DNA0009", "Hardcoded secret", "A secret passed to '{0}' is hardcoded.", 798);
+        public static readonly DiagnosticDescriptor UnsafeDeserializationSetting = Create("DNA0008", "Risky Json.NET polymorphism setting", "Json.NET TypeNameHandling value '{0}' can materialize unexpected types if untrusted JSON is deserialized.", 502);
+        public static readonly DiagnosticDescriptor HardcodedSecret = Create("DNA0009", "Hardcoded secret", "A hardcoded {0} is passed to '{1}'.", 798);
         public static readonly DiagnosticDescriptor CookieConfiguration = Create("DNA0010", "Insecure cookie configuration", "Cookie '{0}' has unsafe settings: {1}.", 614);
         public static readonly DiagnosticDescriptor ServerSideRequestForgery = Taint("DNA0011", "Server-side request forgery", 918);
         public static readonly DiagnosticDescriptor DynamicCodeExecution = Taint("DNA0012", "Dynamic code execution", 94);
-        public static readonly DiagnosticDescriptor WeakCipher = Create("DNA0013", "Weak encryption algorithm", "'{0}' is a legacy cipher; use AES or a supported authenticated cipher.", 327);
-        public static readonly DiagnosticDescriptor EcbMode = Create("DNA0014", "ECB encryption mode", "'{0}' uses ECB, which reveals repeated plaintext blocks.", 327);
+        public static readonly DiagnosticDescriptor WeakCipher = Create("DNA0013", "Legacy cipher use", "'{0}' uses a legacy cipher; review whether it encrypts new data or only decrypts existing data.", 327);
+        public static readonly DiagnosticDescriptor EcbMode = Create("DNA0014", "ECB mode use", "'{0}' selects ECB; if used for encryption, repeated plaintext blocks can be revealed.", 327);
         public static readonly DiagnosticDescriptor FixedNonce = Create("DNA0015", "Fixed encryption IV or nonce", "'{0}' encrypts with a fixed IV or nonce; generate a fresh value for each encryption.", 329);
         public static readonly DiagnosticDescriptor WeakPbkdf2 = Create("DNA0016", "Low PBKDF2 work factor", "PBKDF2 iteration count {0} is too low for password-derived keys.", 916);
         public static readonly DiagnosticDescriptor HardcodedPqcPrivateKey = Create("DNA0017", "Hardcoded post-quantum private key", "'{0}' imports literal post-quantum private key material.", 321);
@@ -47,8 +46,20 @@ namespace Dotnetarium.Analyzers
                 "Security",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true,
-                description: $"CWE-{cwe}. Review the reported data flow and use a context-appropriate mitigation.",
+                description: id switch
+                {
+                    "DNA0008" => "CWE-502. Review non-default Json.NET type-name handling when deserializing untrusted data.",
+                    "DNA0009" => "CWE-798. A literal credential or cryptographic key reaches a security-sensitive API.",
+                    "DNA0010" => "Review explicit authentication, session, or cross-site cookie settings.",
+                    "DNA0013" or "DNA0014" => $"CWE-{cwe}. Review whether the configured cipher is used for encryption.",
+                    "DNA0015" => "CWE-329. Encryption uses provably fixed IV or nonce material.",
+                    "DNA0016" => "CWE-916. An explicit PBKDF2 work factor is below a conservative minimum.",
+                    "DNA0017" => "CWE-321. Literal post-quantum private key material is imported.",
+                    _ => $"CWE-{cwe}. Review the reported data flow and use a context-appropriate mitigation."
+                },
                 helpLinkUri: $"https://github.com/dotnetarium/dotnetarium/blob/main/docs/rules/{id}.md",
-                customTags: new[] { $"CWE-{cwe}" });
+                customTags: id == "DNA0010"
+                    ? new[] { "CWE-614", "CWE-1004", "CWE-1275" }
+                    : new[] { $"CWE-{cwe}" });
     }
 }

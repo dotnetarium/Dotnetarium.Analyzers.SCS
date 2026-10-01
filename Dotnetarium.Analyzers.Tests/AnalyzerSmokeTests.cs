@@ -59,7 +59,8 @@ public sealed class AnalyzerSmokeTests
             }
             """, new OpenRedirectTaintAnalyzer());
 
-        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+        Assert.True(diagnostics.Count(diagnostic => diagnostic.Id == "DNA0005") == 1,
+            string.Join("; ", diagnostics.Select(diagnostic => diagnostic.ToString())));
     }
 
     [Fact]
@@ -93,7 +94,8 @@ public sealed class AnalyzerSmokeTests
             }
             """, new OpenRedirectTaintAnalyzer());
 
-        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+        Assert.True(diagnostics.Count(diagnostic => diagnostic.Id == "DNA0005") == 1,
+            string.Join("; ", diagnostics.Select(diagnostic => diagnostic.ToString())));
     }
 
     [Fact]
@@ -148,6 +150,137 @@ public sealed class AnalyzerSmokeTests
             """, new ServerSideRequestForgeryTaintAnalyzer());
 
         Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0011"));
+    }
+
+    [Fact]
+    public async Task Minimal_api_route_parameter_reaches_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            public class Demo
+            {
+                public static void Map(WebApplication app) =>
+                    app.MapGet("/go", (string url) => Results.Redirect(url));
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.True(diagnostics.Count(diagnostic => diagnostic.Id == "DNA0005") == 1,
+            string.Join("; ", diagnostics.Select(diagnostic => diagnostic.ToString())));
+    }
+
+    [Fact]
+    public async Task Minimal_api_service_parameter_is_not_request_data()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public sealed class DestinationService { public string Url => "https://example.test"; }
+            public class Demo
+            {
+                public static void Map(WebApplication app) =>
+                    app.MapGet("/go", ([FromServices] DestinationService destination) =>
+                        Results.Redirect(destination.Url));
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "DNA0005");
+    }
+
+    [Fact]
+    public async Task Minimal_api_named_handler_parameter_reaches_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            public class Demo
+            {
+                public static void Map(WebApplication app) => app.MapGet("/go", Redirect);
+                private static IResult Redirect(string url) => Results.Redirect(url);
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.True(diagnostics.Count(diagnostic => diagnostic.Id == "DNA0005") == 1,
+            string.Join("; ", diagnostics.Select(diagnostic => diagnostic.ToString())));
+    }
+
+    [Fact]
+    public async Task Minimal_api_explicit_body_parameter_reaches_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public sealed class Request { public string Url { get; set; } = ""; }
+            public class Demo
+            {
+                public static void Map(WebApplication app) =>
+                    app.MapPost("/go", ([FromBody] Request request) => Results.Redirect(request.Url));
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Ignored_IsLocalUrl_result_does_not_sanitize_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Mvc;
+            [ApiController]
+            public class Endpoint : ControllerBase
+            {
+                public IActionResult Go(string url)
+                {
+                    Url.IsLocalUrl(url);
+                    return Redirect(url);
+                }
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Parsing_relative_uri_does_not_sanitize_redirect()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using Microsoft.AspNetCore.Mvc;
+            [ApiController]
+            public class Endpoint : ControllerBase
+            {
+                public IActionResult Go(string url)
+                {
+                    Uri.TryCreate(url, UriKind.Relative, out var parsed);
+                    return Redirect(parsed?.ToString() ?? url);
+                }
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DNA0005");
+    }
+
+    [Fact]
+    public async Task Url_encoding_is_not_html_sanitization()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using System.Text.Encodings.Web;
+            using Microsoft.AspNetCore.Html;
+            public class Demo
+            {
+                public void Run()
+                {
+                    var input = Console.ReadLine()!;
+                    _ = new HtmlString(UrlEncoder.Default.Encode(input));
+                    _ = new HtmlString(HtmlEncoder.Default.Encode(input));
+                }
+            }
+            """, new XssTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0003"));
     }
 
     [Fact]
@@ -288,6 +421,25 @@ public sealed class AnalyzerSmokeTests
             class Demo
             {
                 static NetworkCredential Create() => new NetworkCredential("user", "secret");
+            }
+            """, new HardcodedPasswordAnalyzer());
+
+        var finding = Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0009"));
+        Assert.Contains("credential", finding.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Hardcoded_secret_skips_explicit_template_but_reports_real_literal()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System.Net;
+            class Demo
+            {
+                static void Run()
+                {
+                    _ = new NetworkCredential("user", "YOUR_PASSWORD_HERE");
+                    _ = new NetworkCredential("user", "s3cr3t-for-production");
+                }
             }
             """, new HardcodedPasswordAnalyzer());
 
