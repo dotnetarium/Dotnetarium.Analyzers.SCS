@@ -4,12 +4,11 @@ Dotnetarium finds security issues in modern C# applications. The NuGet analyzer 
 
 ## Install
 
-The 2.0 packages are being prepared. These commands apply once the prerelease
-packages are published to NuGet.org.
+Once version 2.0.0 is available on NuGet.org, install both packages:
 
 ```powershell
-dotnet add package Dotnetarium.Analyzers --version 2.0.0-alpha.1
-dotnet tool install --global dotnetarium --version 2.0.0-alpha.1
+dotnet add package Dotnetarium.Analyzers --version 2.0.0
+dotnet tool install --global dotnetarium --version 2.0.0
 ```
 
 The analyzer targets `netstandard2.0` for the Roslyn host and uses Roslyn 5.0, which requires Visual Studio 2026 (18.0) or a compatible .NET SDK. The global tool requires the .NET 10 runtime and an SDK capable of loading the target project. The tool scans C# projects targeting .NET 8 or .NET 10; Visual Basic and .NET Framework support ended with 1.x.
@@ -60,6 +59,7 @@ dotnet_diagnostic.DNA0010.severity = error
 The repository contains the analyzer, global tool, xUnit tests, provider and
 Razor smoke checks, and the selected Roslyn flow utilities. See the
 [architecture notes](docs/Architecture.md) for how they fit together.
+Maintainers can follow the [release instructions](docs/Releasing.md).
 
 ## License
 
