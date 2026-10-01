@@ -29,8 +29,8 @@ Sanitizers are methods or functions that cleanse tainted data, making it safe fo
 
 ## Compatibility
 
-The project uses Roslyn compiler version 3.11.0, thus supporting Visual Studio 2019 version 16.11 and all versions of Visual Studio 2022.
-More information is available [here](https://learn.microsoft.com/en-us/visualstudio/extensibility/roslyn-version-support?view=vs-2022)
+The analyzer uses Roslyn 4.14.0 and requires Visual Studio 2022 version 17.14 or newer. It supports projects targeting .NET 8 and .NET 10.
+See the [Roslyn compatibility table](https://learn.microsoft.com/en-us/visualstudio/extensibility/roslyn-version-support).
 
 ## Contributing
 If you would like to contribute to DotnetariumSCS, please fork the repository and submit a pull request. For major changes, please open an issue to discuss what you would like to change.

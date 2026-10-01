@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>10.0</LangVersion>
+    <MicrosoftCodeAnalysisVersion>4.14.0</MicrosoftCodeAnalysisVersion>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -51,17 +52,12 @@
   
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4">
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <!-- 3.11.0 version is required to support VS 2019 (16.11) and all versions of VS 2022
-    https://learn.microsoft.com/en-us/visualstudio/extensibility/roslyn-version-support?view=vs-2022
-    -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.11.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="3.11.0" />
-    <PackageReference Update="Microsoft.CodeAnalysis.Common" Version="3.11.0" />
-    <PackageReference Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="3.11.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="YamlDotNet" Version="15.3.0" />
     <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
   </ItemGroup>
@@ -77,12 +73,6 @@
   <Import Project="..\Roslyn\FlowAnalysis\FlowAnalysis.Utilities.projitems" Label="Shared" />
 
   <Import Project="..\Roslyn\Workspaces\Workspaces.Utilities.projitems" Label="Shared" />
-
-  <ItemGroup>
-    <PackageReference Update="Microsoft.CodeAnalysis" Version="3.11.0" />
-    <PackageReference Update="Microsoft.CodeAnalysis.Common" Version="3.11.0" />
-    <PackageReference Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="3.11.0" />
-  </ItemGroup>
 
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
