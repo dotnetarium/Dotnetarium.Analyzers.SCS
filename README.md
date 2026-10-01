@@ -1,70 +1,67 @@
-# Dotnetarium 2.x
+# Dotnetarium
 
-Dotnetarium finds security issues in modern C# applications. The NuGet analyzer runs during builds; the `dotnetarium` global tool scans a project or solution and can write SARIF 2.1.0. Both use the same DNA rules and configuration.
+Dotnetarium checks modern C# projects for security problems. It follows untrusted data through code and reports other unsafe patterns. Findings use `DNA` rule IDs and include CWE groups.
+
+Use the **NuGet analyzer** to see findings during a build, or the **global tool** to scan a project or solution and produce SARIF for CI. Both use the same rules.
+
+It checks injection paths through SQL, commands, HTML, file paths, redirects, LDAP, XPath, outbound requests, and dynamic code. It also checks unsafe deserialization, hardcoded secrets, and cookie settings. See the [rule notes](docs/rules) for coverage and limitations, including [Razor and Blazor](docs/razor-blazor-taint.md).
+
+> **2.x release status:** The new package IDs are not on NuGet.org yet. The install commands below will work after the first 2.x release. You can [run the tool from source](#run-from-source) now.
 
 ## Install
 
-Once version 2.0.0 is available on NuGet.org, install both packages:
+Add the analyzer to each C# project you want checked:
 
-```powershell
-dotnet add package Dotnetarium.Analyzers --version 2.0.0
-dotnet tool install --global dotnetarium --version 2.0.0
+```sh
+dotnet add MyApp.csproj package Dotnetarium.Analyzers
 ```
 
-The analyzer targets `netstandard2.0` for the Roslyn host and uses Roslyn 5.0, which requires Visual Studio 2026 (18.0) or a compatible .NET SDK. The global tool requires the .NET 10 runtime and an SDK capable of loading the target project. The tool scans C# projects targeting .NET 8 or .NET 10; Visual Basic and .NET Framework support ended with 1.x.
+Install the scanner once per machine:
 
-## Scan
+```sh
+dotnet tool install --global dotnetarium
+```
 
-```powershell
+The global tool needs the .NET 10 runtime and an installed SDK that can load the project. It scans C# projects targeting .NET 8 or .NET 10. For IDE diagnostics, the analyzer needs a Roslyn 5.0 host such as Visual Studio 2026.
+
+## Scan a project or solution
+
+```sh
+dotnetarium MyApp.sln
 dotnetarium MyApp.sln --sarif results.sarif --fail
 ```
 
-SARIF source paths are relative to the solution or project directory. CWE groups appear in console output and SARIF rule metadata by default. Run `dotnetarium --help` for all options.
+The tool accepts `.csproj`, `.sln`, and `.slnx` files. `--sarif` writes SARIF 2.1.0 with relative source paths and available data-flow paths. `--fail` returns exit code 1 when there are findings, which is useful in CI. Without it, findings are printed but do not fail the command. An incomplete scan or invalid input returns exit code 2.
 
-The tool discovers an installed .NET SDK using the scanned solution or project directory, so a nearby `global.json` selects the SDK when several are installed. The .NET 10 runtime is required to run the global tool. The SDK needed to load a project must also be installed; the project's target framework alone does not select it.
+The tool selects an installed SDK using the scanned project or solution directory, including its `global.json` if present. Run `dotnetarium --help` for the complete CLI.
 
-## Moving from 1.x
+## Configure rules
 
-The 1.x line is preserved on the `release/1.x` branch. Version 2 uses new
-package IDs and a new command: replace `Dotnetarium.Analyzers.SCS` with
-`Dotnetarium.Analyzers` and `dotnetarium-scs` with `dotnetarium`. Rules have new
-`DNA` IDs, so update `.editorconfig` and any SARIF filters. Replace legacy YAML
-rule extensions with `dotnetarium.json`. The 2.x analyzer supports modern C#;
-the tool needs a .NET 10 runtime and scans .NET 8 or .NET 10 projects.
+Built-in models cover common .NET and provider APIs. To add a source, sink, sanitizer, or transfer, place `dotnetarium.json` beside a project. The NuGet analyzer picks it up during builds, and the global tool finds it when scanning that project. For a solution scan, a file beside the solution applies to projects without their own config. Use `--config path/to/rules.json` to override automatic discovery for a scan.
 
-## Rules
-
-| ID | Finding |
-| --- | --- |
-| DNA0001 | SQL injection |
-| DNA0002 | OS command injection |
-| DNA0003 | Cross-site scripting |
-| DNA0004 | Path escape, including archive extraction |
-| DNA0005 | Open redirect |
-| DNA0006 | LDAP injection (filter and distinguished name contexts) |
-| DNA0007 | XPath injection |
-| DNA0008 | Unsafe deserialization |
-| DNA0009 | Hardcoded secret |
-| DNA0010 | Insecure cookie configuration (Secure, HttpOnly, SameSite) |
-| DNA0011 | Server-side request forgery |
-| DNA0012 | Dynamic code execution |
-
-DNA IDs start afresh in 2.x. CWE numbers are grouping metadata, not rule IDs. See [rule configuration](docs/RuleConfiguration.md) and the individual [rule notes](docs/rules) for examples and limitations.
-
-Place `dotnetarium.json` beside a project to extend the built-in source, sink, sanitizer, and transfer models. The analyzer package includes it automatically during builds. The global tool also finds a file beside the scanned project or solution; `--config` selects another file. Configuration is JSON parsed with `System.Text.Json`. Use `.editorconfig` for diagnostic severity:
+Use `.editorconfig` to change a diagnostic's severity:
 
 ```ini
 [*.cs]
 dotnet_diagnostic.DNA0010.severity = error
 ```
 
-The repository contains the analyzer, global tool, xUnit tests, provider and
-Razor smoke checks, and the selected Roslyn flow utilities. See the
-[architecture notes](docs/Architecture.md) for how they fit together.
-Maintainers can follow the [release instructions](docs/Releasing.md).
+See the [configuration guide](docs/RuleConfiguration.md) for the JSON format.
 
-## License
+## Run from source
 
-Dotnetarium 2.x is licensed under [Apache License 2.0](LICENSE). The bundled
-Roslyn sources retain their original licenses; see
-[third-party notices](THIRD_PARTY_NOTICES.md).
+With a .NET 10 SDK installed, clone this repository and run from its root:
+
+```sh
+dotnet run --project Dotnetarium.Tool/Dotnetarium.Tool.csproj -- MyApp.sln --sarif results.sarif --fail
+```
+
+## Moving from 1.x
+
+Version 2 replaces the `Dotnetarium.Analyzers.SCS` package with `Dotnetarium.Analyzers` and the `dotnetarium-scs` command with `dotnetarium`. Rule IDs now use the `DNA` prefix; update any `.editorconfig` settings and SARIF filters. Use `dotnetarium.json` in place of legacy YAML rule extensions. Version 2 supports C# on modern .NET; the old .NET Framework and Visual Basic line remains on [`release/1.x`](https://github.com/dotnetarium/dotnetarium/tree/release/1.x).
+
+## About this repository
+
+The repository contains the analyzer, global tool, tests, and selected Roslyn flow utilities. See the [architecture notes](docs/Architecture.md) and [release instructions](docs/Releasing.md).
+
+Dotnetarium 2.x is licensed under [Apache License 2.0](LICENSE). Bundled Roslyn sources retain their original licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).

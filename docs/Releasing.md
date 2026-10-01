@@ -23,8 +23,8 @@ source of truth is `main`. Both packages use the same version.
 ## Release
 
 1. Set the same version in `Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj`
-   and `Dotnetarium.Tool/Dotnetarium.Tool.csproj`, and update the installation
-   examples in the root README. Merge the change to `main` after CI passes.
+   and `Dotnetarium.Tool/Dotnetarium.Tool.csproj`. Merge the change to `main`
+   after CI passes.
 2. Tag that merged commit `v<version>`, such as `v2.0.0`. Verify the tag
    points to the release commit before publishing the GitHub release.
 3. Publish a GitHub release for that tag. Keep the description to short
@@ -35,7 +35,8 @@ source of truth is `main`. Both packages use the same version.
    bypass as described above. The publishing job obtains a short-lived NuGet
    credential, publishes both packages, and adds
    the `.nupkg` files to the GitHub release. Verify both package pages and a
-   fresh `dotnet tool install --global dotnetarium` after indexing.
+   fresh `dotnet tool install --global dotnetarium` after indexing. After the
+   first 2.x publication, remove the pending-release note from the root README.
 5. After the new packages are available, deprecate the 1.x package IDs on
    NuGet.org as legacy and point each one to its 2.x replacement. Leave the
    old packages listed so existing consumers can still find them.

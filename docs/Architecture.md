@@ -38,4 +38,5 @@ possible targets; the analyzer does not execute dependency injection.
 coverage. `tests/ModernSinkSmoke/` checks real provider APIs,
 `tests/RazorSmoke/` checks Razor and Blazor cases, and `tests/CliSmoke/`
 installs both packed NuGet packages and scans .NET 8 and .NET 10 fixtures.
-The build workflow runs these checks on Windows.
+The build workflow runs the full suite on Windows and a packaged CLI smoke
+check on Linux.
