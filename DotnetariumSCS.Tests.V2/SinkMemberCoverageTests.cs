@@ -177,6 +177,13 @@ public sealed partial class SinkCoverageTests
         yield return P("System.Xml.Schema.XmlSchemaXPath", "DNA0007", "XPath", "new System.Xml.Schema.XmlSchemaXPath().XPath = input;");
 
         yield return P("System.Data.IDbCommand", "DNA0001", "CommandText", "((System.Data.IDbCommand)null!).CommandText = input;");
+        yield return M("Dapper.CommandDefinition", "DNA0001", ".ctor", "_ = new Dapper.CommandDefinition(input);");
+        foreach (var member in new[] { "Execute", "ExecuteAsync", "ExecuteReader", "ExecuteReaderAsync", "ExecuteScalar", "ExecuteScalarAsync", "Query", "QueryAsync", "QueryFirst", "QueryFirstAsync", "QueryFirstOrDefault", "QueryFirstOrDefaultAsync", "QueryMultiple", "QueryMultipleAsync", "QuerySingle", "QuerySingleAsync", "QuerySingleOrDefault", "QuerySingleOrDefaultAsync", "QueryUnbufferedAsync" })
+            yield return M("Dapper.SqlMapper", "DNA0001", member, $"_ = Dapper.SqlMapper.{member}(null!, input);");
+        yield return M("Npgsql.NpgsqlCommand", "DNA0001", ".ctor", "_ = new Npgsql.NpgsqlCommand(input);");
+        yield return M("Npgsql.NpgsqlBatchCommand", "DNA0001", ".ctor", "_ = new Npgsql.NpgsqlBatchCommand(input);");
+        yield return P("Npgsql.NpgsqlBatchCommand", "DNA0001", "CommandText", "new Npgsql.NpgsqlBatchCommand(\"fixed\").CommandText = input;");
+        yield return M("Npgsql.NpgsqlDataSource", "DNA0001", "CreateCommand", "_ = Npgsql.NpgsqlDataSource.Create(\"Host=localhost\").CreateCommand(input);");
         foreach (var member in new[] { "ExecuteDataRow", "ExecuteDataRowAsync", "ExecuteDataset", "ExecuteDatasetAsync", "ExecuteNonQuery", "ExecuteNonQueryAsync", "ExecuteReader", "ExecuteReaderAsync", "ExecuteScalar", "ExecuteScalarAsync" })
             yield return M("MySql.Data.MySqlClient.MySqlHelper", "DNA0001", member, $"_ = MySql.Data.MySqlClient.MySqlHelper.{member}(\"connection\", input);");
         foreach (var member in new[] { "UpdateDataSet", "UpdateDataSetAsync" })

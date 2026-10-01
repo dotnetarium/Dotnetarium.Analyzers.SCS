@@ -1868,6 +1868,92 @@
       ]
     },
     {
+      "Type": "Dapper.CommandDefinition",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Dapper.SqlMapper",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        { "Name": "Execute", "Arguments": ["sql"] },
+        { "Name": "ExecuteAsync", "Arguments": ["sql"] },
+        { "Name": "ExecuteReader", "Arguments": ["sql"] },
+        { "Name": "ExecuteReaderAsync", "Arguments": ["sql"] },
+        { "Name": "ExecuteScalar", "Arguments": ["sql"] },
+        { "Name": "ExecuteScalarAsync", "Arguments": ["sql"] },
+        { "Name": "Query", "Arguments": ["sql"] },
+        { "Name": "QueryAsync", "Arguments": ["sql"] },
+        { "Name": "QueryFirst", "Arguments": ["sql"] },
+        { "Name": "QueryFirstAsync", "Arguments": ["sql"] },
+        { "Name": "QueryFirstOrDefault", "Arguments": ["sql"] },
+        { "Name": "QueryFirstOrDefaultAsync", "Arguments": ["sql"] },
+        { "Name": "QueryMultiple", "Arguments": ["sql"] },
+        { "Name": "QueryMultipleAsync", "Arguments": ["sql"] },
+        { "Name": "QuerySingle", "Arguments": ["sql"] },
+        { "Name": "QuerySingleAsync", "Arguments": ["sql"] },
+        { "Name": "QuerySingleOrDefault", "Arguments": ["sql"] },
+        { "Name": "QuerySingleOrDefaultAsync", "Arguments": ["sql"] },
+        { "Name": "QueryUnbufferedAsync", "Arguments": ["sql"] }
+      ]
+    },
+    {
+      "Type": "Npgsql.NpgsqlCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "cmdText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Npgsql.NpgsqlBatchCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ],
+      "Properties": [
+        "CommandText"
+      ]
+    },
+    {
+      "Type": "Npgsql.NpgsqlDataSource",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "CreateCommand",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
+    },
+    {
       "Type": "MySql.Data.MySqlClient.MySqlHelper",
       "TaintTypes": [
         "SqlInjection"

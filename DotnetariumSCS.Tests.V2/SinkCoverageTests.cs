@@ -49,6 +49,11 @@ public sealed partial class SinkCoverageTests
         new("System.Xml.XPath.Extensions", "DNA0007", "_ = System.Xml.XPath.Extensions.XPathSelectElement(new System.Xml.Linq.XDocument(), input);"),
         new("System.Xml.Schema.XmlSchemaXPath", "DNA0007", "_ = new System.Xml.Schema.XmlSchemaXPath { XPath = input };"),
         new("System.Data.IDbCommand", "DNA0001", "((System.Data.IDbCommand)null!).CommandText = input;"),
+        new("Dapper.CommandDefinition", "DNA0001", "_ = new Dapper.CommandDefinition(input);"),
+        new("Dapper.SqlMapper", "DNA0001", "_ = Dapper.SqlMapper.Query(null!, input);"),
+        new("Npgsql.NpgsqlCommand", "DNA0001", "_ = new Npgsql.NpgsqlCommand(input);"),
+        new("Npgsql.NpgsqlBatchCommand", "DNA0001", "_ = new Npgsql.NpgsqlBatchCommand(input);"),
+        new("Npgsql.NpgsqlDataSource", "DNA0001", "_ = Npgsql.NpgsqlDataSource.Create(\"Host=localhost\").CreateCommand(input);"),
         new("MySql.Data.MySqlClient.MySqlHelper", "DNA0001", "_ = MySql.Data.MySqlClient.MySqlHelper.ExecuteNonQuery(\"connection\", input);"),
         new("System.Data.SQLite.SQLiteCommand", "DNA0001", "_ = System.Data.SQLite.SQLiteCommand.Execute(input, System.Data.SQLite.SQLiteExecuteType.NonQuery, \"Data Source=:memory:;\");"),
         new("Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions", "DNA0001", "_ = Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRaw(null!, input);"),
@@ -182,6 +187,52 @@ public sealed partial class SinkCoverageTests
             public sealed class SQLiteCommand
             {
                 public static int Execute(string commandText, SQLiteExecuteType executeType, string connectionString) => 0;
+            }
+        }
+        namespace Dapper
+        {
+            public readonly struct CommandDefinition
+            {
+                public CommandDefinition(string commandText) { }
+            }
+            public static class SqlMapper
+            {
+                public static object Execute(object cnn, string sql) => new object();
+                public static object ExecuteAsync(object cnn, string sql) => new object();
+                public static object ExecuteReader(object cnn, string sql) => new object();
+                public static object ExecuteReaderAsync(object cnn, string sql) => new object();
+                public static object ExecuteScalar(object cnn, string sql) => new object();
+                public static object ExecuteScalarAsync(object cnn, string sql) => new object();
+                public static object Query(object cnn, string sql) => new object();
+                public static object QueryAsync(object cnn, string sql) => new object();
+                public static object QueryFirst(object cnn, string sql) => new object();
+                public static object QueryFirstAsync(object cnn, string sql) => new object();
+                public static object QueryFirstOrDefault(object cnn, string sql) => new object();
+                public static object QueryFirstOrDefaultAsync(object cnn, string sql) => new object();
+                public static object QueryMultiple(object cnn, string sql) => new object();
+                public static object QueryMultipleAsync(object cnn, string sql) => new object();
+                public static object QuerySingle(object cnn, string sql) => new object();
+                public static object QuerySingleAsync(object cnn, string sql) => new object();
+                public static object QuerySingleOrDefault(object cnn, string sql) => new object();
+                public static object QuerySingleOrDefaultAsync(object cnn, string sql) => new object();
+                public static object QueryUnbufferedAsync(object cnn, string sql) => new object();
+            }
+        }
+        namespace Npgsql
+        {
+            public sealed class NpgsqlCommand
+            {
+                public NpgsqlCommand(string cmdText) { }
+            }
+            public sealed class NpgsqlBatchCommand
+            {
+                public NpgsqlBatchCommand(string commandText) { }
+                public string CommandText { get; set; } = "";
+            }
+            public sealed class NpgsqlDataSource
+            {
+                public static NpgsqlDataSource Create(string connectionString) => new NpgsqlDataSource();
+                public object CreateCommand(string commandText) => new object();
             }
         }
         namespace Microsoft.EntityFrameworkCore

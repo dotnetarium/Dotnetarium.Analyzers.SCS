@@ -43,6 +43,14 @@ var cases = new (string Name, string Statement, string Rule, bool ShouldWarn)[]
     ("CSharpScript RunAsync", "_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.RunAsync(path);", "DNA0012", true),
     ("Json.NET unsafe type names", "_ = new Newtonsoft.Json.JsonSerializerSettings { TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All };", "DNA0008", true),
     ("Json.NET default type names", "_ = new Newtonsoft.Json.JsonSerializerSettings { TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None };", "DNA0008", false),
+    ("Npgsql command constructor", "_ = new Npgsql.NpgsqlCommand(path);", "DNA0001", true),
+    ("Npgsql command text", "new Npgsql.NpgsqlCommand().CommandText = path;", "DNA0001", true),
+    ("Npgsql batch constructor", "_ = new Npgsql.NpgsqlBatchCommand(path);", "DNA0001", true),
+    ("Npgsql batch text", "new Npgsql.NpgsqlBatchCommand().CommandText = path;", "DNA0001", true),
+    ("Npgsql data source command", "_ = Npgsql.NpgsqlDataSource.Create(\"Host=localhost\").CreateCommand(path);", "DNA0001", true),
+    ("Dapper Query", "_ = Dapper.SqlMapper.Query(new Npgsql.NpgsqlConnection(), path);", "DNA0001", true),
+    ("Dapper CommandDefinition", "_ = new Dapper.CommandDefinition(path);", "DNA0001", true),
+    ("Dapper parameterized query", "_ = Dapper.SqlMapper.Query(new Npgsql.NpgsqlConnection(), \"SELECT @value\", new { value = path });", "DNA0001", false),
 };
 
 foreach (var method in new[] { "ExecuteDataRow", "ExecuteDataRowAsync", "ExecuteDataset", "ExecuteDatasetAsync",
@@ -54,6 +62,9 @@ foreach (var method in new[] { "UpdateDataSet", "UpdateDataSetAsync" })
     cases = cases.Append(("MySqlHelper " + method,
         (method.EndsWith("Async", StringComparison.Ordinal) ? "_ = " : "") +
         "MySql.Data.MySqlClient.MySqlHelper." + method + "(\"server=localhost\", path, new System.Data.DataSet(), \"table\");", "DNA0001", true)).ToArray();
+foreach (var method in new[] { "Execute", "ExecuteAsync", "ExecuteReader", "ExecuteReaderAsync", "ExecuteScalar", "ExecuteScalarAsync", "QueryAsync", "QueryFirst", "QueryFirstAsync", "QueryFirstOrDefault", "QueryFirstOrDefaultAsync", "QueryMultiple", "QueryMultipleAsync", "QuerySingle", "QuerySingleAsync", "QuerySingleOrDefault", "QuerySingleOrDefaultAsync", "QueryUnbufferedAsync" })
+    cases = cases.Append(("Dapper " + method,
+        "_ = Dapper.SqlMapper." + method + "(new Npgsql.NpgsqlConnection(), path);", "DNA0001", true)).ToArray();
 
 // Keep real-package witnesses synchronized with the optional-provider sink inventory.
 var providerNames = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -68,11 +79,18 @@ var providerNames = new Dictionary<string, string>(StringComparer.Ordinal)
     ["EF Core ExecuteSqlRawAsync"] = "Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions|M:ExecuteSqlRawAsync",
     ["EF Core FromSqlRaw"] = "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions|M:FromSqlRaw",
     ["CSharpScript EvaluateAsync"] = "Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript|M:EvaluateAsync",
-    ["CSharpScript RunAsync"] = "Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript|M:RunAsync"
+    ["CSharpScript RunAsync"] = "Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript|M:RunAsync",
+    ["Npgsql command constructor"] = "Npgsql.NpgsqlCommand|M:.ctor",
+    ["Npgsql batch constructor"] = "Npgsql.NpgsqlBatchCommand|M:.ctor",
+    ["Npgsql batch text"] = "Npgsql.NpgsqlBatchCommand|P:CommandText",
+    ["Npgsql data source command"] = "Npgsql.NpgsqlDataSource|M:CreateCommand",
+    ["Dapper Query"] = "Dapper.SqlMapper|M:Query",
+    ["Dapper CommandDefinition"] = "Dapper.CommandDefinition|M:.ctor"
 };
 var providerTypes = new HashSet<string>(providerNames.Values.Select(value => value.Split('|')[0]), StringComparer.Ordinal)
 {
-    "MySql.Data.MySqlClient.MySqlHelper"
+    "MySql.Data.MySqlClient.MySqlHelper",
+    "Dapper.SqlMapper"
 };
 var configuredProviderMembers = new ConfigurationReader().GetBuiltinConfiguration().Sinks
     .Where(sink => providerTypes.Contains(sink.Type))
@@ -80,9 +98,12 @@ var configuredProviderMembers = new ConfigurationReader().GetBuiltinConfiguratio
         .Concat((sink.Properties ?? new HashSet<string>()).Select(property => sink.Type + "|P:" + property)))
     .OrderBy(value => value, StringComparer.Ordinal).ToArray();
 var witnessedProviderMembers = cases
-    .Where(test => providerNames.ContainsKey(test.Name) || test.Name.StartsWith("MySqlHelper ", StringComparison.Ordinal))
+    .Where(test => providerNames.ContainsKey(test.Name) || test.Name.StartsWith("MySqlHelper ", StringComparison.Ordinal) ||
+        (test.Name.StartsWith("Dapper ", StringComparison.Ordinal) && test.ShouldWarn))
     .Select(test => providerNames.TryGetValue(test.Name, out var key) ? key :
-        "MySql.Data.MySqlClient.MySqlHelper|M:" + test.Name["MySqlHelper ".Length..])
+        test.Name.StartsWith("MySqlHelper ", StringComparison.Ordinal)
+            ? "MySql.Data.MySqlClient.MySqlHelper|M:" + test.Name["MySqlHelper ".Length..]
+            : "Dapper.SqlMapper|M:" + test.Name["Dapper ".Length..])
     .OrderBy(value => value, StringComparer.Ordinal).ToArray();
 if (!configuredProviderMembers.SequenceEqual(witnessedProviderMembers))
     throw new Exception("Real provider witnesses differ from configured sinks: " +
@@ -102,6 +123,7 @@ var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
     .Select(path => MetadataReference.CreateFromFile(path))
     .ToArray();
 
+var failures = new List<string>();
 foreach (var test in cases)
 {
     var source = $@"
@@ -125,7 +147,10 @@ public class Row {{ public int Id {{ get; set; }} }}";
         new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     var errors = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
     if (errors.Length != 0)
-        throw new Exception($"{test.Name}: source did not compile: {string.Join("; ", errors.Select(d => d.ToString()))}");
+    {
+        failures.Add($"{test.Name}: source did not compile: {string.Join("; ", errors.Select(d => d.ToString()))}");
+        continue;
+    }
 
     DiagnosticAnalyzer analyzer = test.Rule switch
     {
@@ -140,6 +165,9 @@ public class Row {{ public int Id {{ get; set; }} }}";
         ImmutableArray.Create(analyzer)).GetAnalyzerDiagnosticsAsync();
     var warned = diagnostics.Any(d => d.Id == test.Rule);
     if (warned != test.ShouldWarn)
-        throw new Exception($"{test.Name}: expected warning={test.ShouldWarn}, got {string.Join("; ", diagnostics.Select(d => d.ToString()))}");
-    Console.WriteLine($"PASS {test.Name}");
+        failures.Add($"{test.Name}: expected warning={test.ShouldWarn}, got {string.Join("; ", diagnostics.Select(d => d.ToString()))}");
+    else
+        Console.WriteLine($"PASS {test.Name}");
 }
+if (failures.Count != 0)
+    throw new Exception(string.Join(Environment.NewLine, failures));
