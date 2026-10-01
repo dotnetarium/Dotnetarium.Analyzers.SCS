@@ -154,7 +154,7 @@ internal static class Program
     }
 
     private static void PrintUsage() => Console.WriteLine(
-        "Usage: dotnetarium <solution.sln|project.csproj> [options]\n" +
+        "Usage: dotnetarium <project.csproj|solution.sln|solution.slnx> [options]\n" +
         "  --sarif <path>             Write SARIF 2.1.0\n" +
         "  --config <path>            Override dotnetarium.json (version 2.0)\n" +
         "  --fail                     Return 1 when findings are present\n" +

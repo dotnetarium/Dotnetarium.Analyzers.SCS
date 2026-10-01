@@ -82,7 +82,7 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
 if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
 $tool = Join-Path $toolPath $(if ($IsWindows) { 'dotnetarium.exe' } else { 'dotnetarium' })
 $help = & $tool --help
-if ($LASTEXITCODE -ne 0 -or -not ($help -match '--sarif') -or
+if ($LASTEXITCODE -ne 0 -or -not ($help -match '\.slnx') -or -not ($help -match '--sarif') -or
     -not ($help -match '--fail\b') -or
     ($help -match '--sdk-path|--sarif-absolute-paths|--cwe|--export|--fail-any-warn|--fail-on-findings')) {
     throw 'CLI help does not match the simplified options.'

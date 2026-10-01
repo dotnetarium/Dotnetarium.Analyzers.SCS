@@ -23,8 +23,8 @@ source of truth is `main`. Both packages use the same version.
 ## Release
 
 1. Set the same version in `Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj`
-   and `Dotnetarium.Tool/Dotnetarium.Tool.csproj`, and update the installation
-   examples in the root README. Merge the change to `main` after CI passes.
+   and `Dotnetarium.Tool/Dotnetarium.Tool.csproj`. Merge the change to `main`
+   after CI passes.
 2. Tag that merged commit `v<version>`, such as `v2.0.0`. Verify the tag
    points to the release commit before publishing the GitHub release.
 3. Publish a GitHub release for that tag. Keep the description to short
