@@ -16,7 +16,7 @@ versions for `Dotnetarium*`. This covers `Dotnetarium.Analyzers` and
 1. Set the same version in `Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj`
    and `Dotnetarium.Tool/Dotnetarium.Tool.csproj`, and update the installation
    examples in the root README. Merge the change to `main` after CI passes.
-2. Tag that commit `v<version>`, such as `v2.0.0-alpha.1`.
+2. Tag that commit `v<version>`, such as `v2.0.0`.
 3. Publish a GitHub release for that tag. Keep the description to short
    **Features** and **Bug fixes** bullets, any essential upgrade note, and a
    full changelog link.
