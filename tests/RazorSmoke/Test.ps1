@@ -31,7 +31,7 @@ foreach ($project in @($client, $server)) {
         throw "Razor fixture build failed: $project"
     }
     foreach ($line in $output) {
-        if ($line -match '([^\\/]+\.(?:razor|cshtml|cs))\((\d+),\d+\): warning (SCS\d+)') {
+        if ($line -match '([^\\/]+\.(?:razor|cshtml|cs))\((\d+),\d+\): warning (DNA\d+)') {
             $diagnostics += "$($Matches[1]):$($Matches[2]):$($Matches[3])"
         }
     }
@@ -39,20 +39,20 @@ foreach ($project in @($client, $server)) {
 
 $actual = @($diagnostics | Sort-Object -Unique)
 $expected = @(
-    'ClientProbe.razor:3:SCS0029',
-    'AutoProbe.razor:3:SCS0029',
-    'AutoProbe.razor:4:SCS0029',
-    'ManualComponent.cs:13:SCS0029',
-    'ManualComponent.cs:14:SCS0029',
-    'ManualComponent.cs:15:SCS0029',
-    'ServerProbe.razor:3:SCS0029',
-    'ServerProbe.razor:4:SCS0029',
-    'FormProbe.razor:2:SCS0029',
-    'RouteProbe.razor:2:SCS0029',
-    'RawPage.cshtml:3:SCS0029',
-    'RawPage.cshtml:4:SCS0029',
-    'RawPage.cshtml:9:SCS0029',
-    'RawPage.cshtml:13:SCS0029'
+    'ClientProbe.razor:3:DNA0003',
+    'AutoProbe.razor:3:DNA0003',
+    'AutoProbe.razor:4:DNA0003',
+    'ManualComponent.cs:13:DNA0003',
+    'ManualComponent.cs:14:DNA0003',
+    'ManualComponent.cs:15:DNA0003',
+    'ServerProbe.razor:3:DNA0003',
+    'ServerProbe.razor:4:DNA0003',
+    'FormProbe.razor:2:DNA0003',
+    'RouteProbe.razor:2:DNA0003',
+    'RawPage.cshtml:3:DNA0003',
+    'RawPage.cshtml:4:DNA0003',
+    'RawPage.cshtml:9:DNA0003',
+    'RawPage.cshtml:13:DNA0003'
 ) | Sort-Object
 
 if (Compare-Object $expected $actual) {
