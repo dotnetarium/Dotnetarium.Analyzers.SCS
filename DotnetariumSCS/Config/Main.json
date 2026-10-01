@@ -1118,38 +1118,8 @@
       ],
       "IsAnyStringParameterInConstructorASink": true,
       "Properties": [
-        "ArgumentList",
         "Arguments",
         "FileName"
-      ]
-    },
-    {
-      "Type": "System.Runtime.Serialization.NetDataContractSerializer",
-      "TaintTypes": [
-        "UnsafeDeserialization"
-      ],
-      "Methods": [
-        {
-          "Name": "Deserialize",
-          "Arguments": [
-            "stream"
-          ]
-        },
-        {
-          "Name": "ReadObject",
-          "Arguments": [
-            "reader"
-          ]
-        }
-      ]
-    },
-    {
-      "Type": "Newtonsoft.Json.JsonSerializerSettings",
-      "TaintTypes": [
-        "UnsafeDeserialization"
-      ],
-      "Properties": [
-        "TypeNameHandling"
       ]
     },
     {
@@ -1507,12 +1477,6 @@
           ]
         },
         {
-          "Name": "SetAccessControl",
-          "Arguments": [
-            "path"
-          ]
-        },
-        {
           "Name": "WriteAllBytes",
           "Arguments": [
             "path"
@@ -1602,12 +1566,6 @@
           ]
         },
         {
-          "Name": "ReflectionOnlyLoadFrom",
-          "Arguments": [
-            "assemblyFile"
-          ]
-        },
-        {
           "Name": "UnsafeLoadFrom",
           "Arguments": [
             "assemblyFile"
@@ -1666,7 +1624,6 @@
         {
           "Name": ".ctor",
           "Arguments": [
-            "handle",
             "path"
           ]
         }
@@ -1844,24 +1801,6 @@
           ]
         },
         {
-          "Name": "SelectAncestors",
-          "Arguments": [
-            "name"
-          ]
-        },
-        {
-          "Name": "SelectChildren",
-          "Arguments": [
-            "name"
-          ]
-        },
-        {
-          "Name": "SelectDescendants",
-          "Arguments": [
-            "name"
-          ]
-        },
-        {
           "Name": "SelectSingleNode",
           "Arguments": [
             "xpath"
@@ -1923,19 +1862,96 @@
       "TaintTypes": [
         "SqlInjection"
       ],
-      "IsAnyStringParameterInConstructorASink": true,
       "IsInterface": true,
       "Properties": [
         "CommandText"
       ]
     },
     {
-      "Type": "System.Data.IDataAdapter",
+      "Type": "Dapper.CommandDefinition",
       "TaintTypes": [
         "SqlInjection"
       ],
-      "IsAnyStringParameterInConstructorASink": true,
-      "IsInterface": true
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Dapper.SqlMapper",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        { "Name": "Execute", "Arguments": ["sql"] },
+        { "Name": "ExecuteAsync", "Arguments": ["sql"] },
+        { "Name": "ExecuteReader", "Arguments": ["sql"] },
+        { "Name": "ExecuteReaderAsync", "Arguments": ["sql"] },
+        { "Name": "ExecuteScalar", "Arguments": ["sql"] },
+        { "Name": "ExecuteScalarAsync", "Arguments": ["sql"] },
+        { "Name": "Query", "Arguments": ["sql"] },
+        { "Name": "QueryAsync", "Arguments": ["sql"] },
+        { "Name": "QueryFirst", "Arguments": ["sql"] },
+        { "Name": "QueryFirstAsync", "Arguments": ["sql"] },
+        { "Name": "QueryFirstOrDefault", "Arguments": ["sql"] },
+        { "Name": "QueryFirstOrDefaultAsync", "Arguments": ["sql"] },
+        { "Name": "QueryMultiple", "Arguments": ["sql"] },
+        { "Name": "QueryMultipleAsync", "Arguments": ["sql"] },
+        { "Name": "QuerySingle", "Arguments": ["sql"] },
+        { "Name": "QuerySingleAsync", "Arguments": ["sql"] },
+        { "Name": "QuerySingleOrDefault", "Arguments": ["sql"] },
+        { "Name": "QuerySingleOrDefaultAsync", "Arguments": ["sql"] },
+        { "Name": "QueryUnbufferedAsync", "Arguments": ["sql"] }
+      ]
+    },
+    {
+      "Type": "Npgsql.NpgsqlCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "cmdText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Npgsql.NpgsqlBatchCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ],
+      "Properties": [
+        "CommandText"
+      ]
+    },
+    {
+      "Type": "Npgsql.NpgsqlDataSource",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "CreateCommand",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
     },
     {
       "Type": "MySql.Data.MySqlClient.MySqlHelper",
@@ -2044,18 +2060,6 @@
           ]
         },
         {
-          "Name": "ExecuteSqlCommand",
-          "Arguments": [
-            "sql"
-          ]
-        },
-        {
-          "Name": "ExecuteSqlCommandAsync",
-          "Arguments": [
-            "sql"
-          ]
-        },
-        {
           "Name": "ExecuteSqlRaw",
           "Arguments": [
             "sql"
@@ -2077,12 +2081,6 @@
       "Methods": [
         {
           "Name": "FromSqlRaw",
-          "Arguments": [
-            "sql"
-          ]
-        },
-        {
-          "Name": "FromSql",
           "Arguments": [
             "sql"
           ]

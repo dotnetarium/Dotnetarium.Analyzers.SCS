@@ -14,6 +14,7 @@ namespace Dotnetarium.Analyzers
         public static readonly DiagnosticDescriptor LdapInjection = Taint("DNA0006", "LDAP injection", 90);
         public static readonly DiagnosticDescriptor XPathInjection = Taint("DNA0007", "XPath injection", 643);
         public static readonly DiagnosticDescriptor UnsafeDeserialization = Taint("DNA0008", "Unsafe deserialization", 502);
+        public static readonly DiagnosticDescriptor UnsafeDeserializationSetting = Create("DNA0008", "Unsafe deserialization", "Json.NET TypeNameHandling value '{0}' can materialize untrusted types.", 502);
         public static readonly DiagnosticDescriptor HardcodedSecret = Create("DNA0009", "Hardcoded secret", "A secret passed to '{0}' is hardcoded.", 798);
         public static readonly DiagnosticDescriptor CookieConfiguration = Create("DNA0010", "Insecure cookie configuration", "Cookie '{0}' has unsafe settings: {1}.", 614);
         public static readonly DiagnosticDescriptor ServerSideRequestForgery = Taint("DNA0011", "Server-side request forgery", 918);
