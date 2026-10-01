@@ -35,3 +35,20 @@ jobs:
           name: dotnetarium-2-packages
           path: artifacts/*.nupkg
           retention-days: 7
+
+  linux-package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pack analyzer and global tool
+        run: |
+          dotnet pack Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj -c Release -p:RunAnalyzers=false -o artifacts
+          dotnet pack Dotnetarium.Tool/Dotnetarium.Tool.csproj -c Release -p:RunAnalyzers=false -o artifacts
+      - name: Scan with lowercase project config
+        shell: pwsh
+        run: ./tests/CliSmoke/Test.ps1

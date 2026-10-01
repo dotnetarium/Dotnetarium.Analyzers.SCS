@@ -12,7 +12,7 @@ namespace Dotnetarium.Config
 {
     internal sealed class ConfigurationReader
     {
-        private const string ProjectFileName = "Dotnetarium.json";
+        private const string ProjectFileName = "dotnetarium.json";
         private const string EmbeddedFileName = "Dotnetarium.Analyzers.Config.Main.json";
         private static readonly JsonSerializerOptions Options = CreateOptions();
 
@@ -74,17 +74,24 @@ namespace Dotnetarium.Config
         public ConfigData GetProjectConfiguration(ImmutableArray<AdditionalText> files)
         {
             ConfigData project = null;
+            string projectPath = null;
             foreach (var file in files)
             {
                 if (!string.Equals(Path.GetFileName(file.Path), ProjectFileName, StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (project != null)
-                    throw new ArgumentException("More than one Dotnetarium.json was supplied.");
+                {
+                    if (string.Equals(Path.GetFullPath(file.Path), projectPath,
+                            Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                        continue;
+                    throw new ArgumentException("More than one dotnetarium.json was supplied.");
+                }
 
                 var content = file.GetText()?.ToString() ?? string.Empty;
                 using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
                 using var reader = new StreamReader(stream);
                 project = DeserializeAndValidate<ConfigData>(reader, validate: true);
+                projectPath = Path.GetFullPath(file.Path);
                 if (project.Version != "2.0")
                     throw new ArgumentException($"Configuration in '{file.Path}' requires \"Version\": \"2.0\".");
             }

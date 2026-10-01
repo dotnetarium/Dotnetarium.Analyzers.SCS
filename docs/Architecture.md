@@ -9,7 +9,7 @@ write SARIF 2.1.0. The tool supports projects targeting .NET 8 or .NET 10.
 
 `Dotnetarium.Analyzers/Config/Main.json` contains the built-in source, sink,
 sanitizer, and transfer models. Projects can extend those models with a
-`Dotnetarium.json` additional file; the tool accepts it with `--config`.
+`dotnetarium.json` additional file; the tool finds it beside a project or solution and accepts an override with `--config`.
 The JSON schema and examples are in [RuleConfiguration.md](RuleConfiguration.md).
 Public diagnostics use sequential `DNA` IDs. CWE numbers are metadata.
 

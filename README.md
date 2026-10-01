@@ -29,7 +29,7 @@ The 1.x line is preserved on the `release/1.x` branch. Version 2 uses new
 package IDs and a new command: replace `Dotnetarium.Analyzers.SCS` with
 `Dotnetarium.Analyzers` and `dotnetarium-scs` with `dotnetarium`. Rules have new
 `DNA` IDs, so update `.editorconfig` and any SARIF filters. Replace legacy YAML
-rule extensions with `Dotnetarium.json`. The 2.x analyzer supports modern C#;
+rule extensions with `dotnetarium.json`. The 2.x analyzer supports modern C#;
 the tool needs a .NET 10 runtime and scans .NET 8 or .NET 10 projects.
 
 ## Rules
@@ -51,7 +51,7 @@ the tool needs a .NET 10 runtime and scans .NET 8 or .NET 10 projects.
 
 DNA IDs start afresh in 2.x. CWE numbers are grouping metadata, not rule IDs. See [rule configuration](docs/RuleConfiguration.md) and the individual [rule notes](docs/rules) for examples and limitations.
 
-Add `Dotnetarium.json` as an `AdditionalFiles` item to extend the built-in source, sink, sanitizer, and transfer models. Configuration is JSON parsed with `System.Text.Json`. Use `.editorconfig` for diagnostic severity:
+Place `dotnetarium.json` beside a project to extend the built-in source, sink, sanitizer, and transfer models. The analyzer package includes it automatically during builds. The global tool also finds a file beside the scanned project or solution; `--config` selects another file. Configuration is JSON parsed with `System.Text.Json`. Use `.editorconfig` for diagnostic severity:
 
 ```ini
 [*.cs]

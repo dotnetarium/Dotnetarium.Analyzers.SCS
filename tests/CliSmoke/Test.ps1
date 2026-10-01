@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $feed "dotnetarium.$toolVersion.nupk
     throw 'Pack both 2.x packages into artifacts before running this smoke check.'
 }
 
-$scratch = Join-Path $env:TEMP ('dotnetarium-cli-smoke-' + [guid]::NewGuid().ToString('N'))
+$scratch = Join-Path ([System.IO.Path]::GetTempPath()) ('dotnetarium-cli-smoke-' + [guid]::NewGuid().ToString('N'))
 $toolPath = Join-Path $scratch 'tool'
 $projectPath = Join-Path $scratch 'project'
 New-Item -ItemType Directory -Path $scratch, $toolPath, $projectPath -Force | Out-Null
@@ -80,7 +80,7 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
 
 & dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --add-source $feed --ignore-failed-sources --no-cache
 if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
-$tool = Join-Path $toolPath 'dotnetarium.exe'
+$tool = Join-Path $toolPath $(if ($IsWindows) { 'dotnetarium.exe' } else { 'dotnetarium' })
 $help = & $tool --help
 if ($LASTEXITCODE -ne 0 -or -not ($help -match '--sarif') -or
     -not ($help -match '--fail\b') -or
@@ -159,15 +159,27 @@ $config = Join-Path $scratch 'custom.json'
   ]
 }
 '@ | Set-Content -LiteralPath $config -Encoding utf8
-$customOutput = & $tool $project --config $config
-if ($LASTEXITCODE -ne 0 -or -not ($customOutput -match 'DNA0001')) {
-    throw 'CLI did not load the custom JSON sink.'
+Copy-Item -LiteralPath $config -Destination (Join-Path $projectPath 'dotnetarium.json')
+$configuredBuild = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
+if ($LASTEXITCODE -ne 0 -or ([regex]::Matches(($configuredBuild -join "`n"), 'DNA0001')).Count -lt 3) {
+    $configuredBuild | Write-Output
+    throw 'Packaged analyzer did not include lowercase dotnetarium.json automatically.'
+}
+$customOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ([regex]::Matches(($customOutput -join "`n"), 'DNA0001')).Count -ne 3) {
+    throw 'CLI did not discover lowercase dotnetarium.json.'
+}
+$override = Join-Path $scratch 'override.json'
+'{"Version":"2.0","Sinks":[]}' | Set-Content -LiteralPath $override -Encoding utf8
+$overrideOutput = & $tool $project --config $override
+if ($LASTEXITCODE -ne 0 -or ([regex]::Matches(($overrideOutput -join "`n"), 'DNA0001')).Count -ne 2) {
+    throw 'Explicit --config did not override the project config.'
 }
 
 $bad = Join-Path $scratch 'bad.json'
 '{"Version":"2.0","Sinkz":[]}' | Set-Content -LiteralPath $bad -Encoding utf8
 $badOutput = & $tool $project --config $bad 2>&1
-if ($LASTEXITCODE -ne 2 -or -not ($badOutput -match 'Invalid Dotnetarium.json')) {
+if ($LASTEXITCODE -ne 2 -or -not ($badOutput -match 'Invalid dotnetarium.json')) {
     throw 'CLI did not reject an invalid JSON rule field.'
 }
 

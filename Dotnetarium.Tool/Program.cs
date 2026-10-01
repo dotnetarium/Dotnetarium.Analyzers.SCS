@@ -38,6 +38,7 @@ internal static class Program
             if (!File.Exists(target))
                 throw new FileNotFoundException("Project or solution was not found.", target);
             var root = Path.GetDirectoryName(target)!;
+            var defaultConfig = Path.Combine(root, "dotnetarium.json");
             var sdkQuery = VisualStudioInstanceQueryOptions.Default;
             sdkQuery.WorkingDirectory = root;
             var sdk = MSBuildLocator.QueryVisualStudioInstances(sdkQuery).FirstOrDefault() ??
@@ -84,9 +85,11 @@ internal static class Program
                 var additionalFiles = project.AnalyzerOptions.AdditionalFiles;
                 if (options.ConfigPath != null)
                     additionalFiles = additionalFiles
-                        .Where(file => !string.Equals(Path.GetFileName(file.Path), "Dotnetarium.json", StringComparison.OrdinalIgnoreCase))
+                        .Where(file => !IsConfigurationFile(file.Path))
                         .Append(new FileAdditionalText(options.ConfigPath))
                         .ToImmutableArray();
+                else if (File.Exists(defaultConfig) && !additionalFiles.Any(file => IsConfigurationFile(file.Path)))
+                    additionalFiles = additionalFiles.Add(new FileAdditionalText(defaultConfig));
                 var analyzerOptions = new AnalyzerOptions(additionalFiles, project.AnalyzerOptions.AnalyzerConfigOptionsProvider);
                 var result = await compilation.WithAnalyzers(analyzers, analyzerOptions).GetAllDiagnosticsAsync();
                 var projectErrors = result.Where(diagnostic =>
@@ -140,7 +143,7 @@ internal static class Program
         }
         catch (System.Text.Json.JsonException error)
         {
-            Console.Error.WriteLine("Invalid Dotnetarium.json: " + error.Message);
+            Console.Error.WriteLine("Invalid dotnetarium.json: " + error.Message);
             return 2;
         }
         catch (Exception error)
@@ -153,7 +156,7 @@ internal static class Program
     private static void PrintUsage() => Console.WriteLine(
         "Usage: dotnetarium <solution.sln|project.csproj> [options]\n" +
         "  --sarif <path>             Write SARIF 2.1.0\n" +
-        "  --config <path>            Load Dotnetarium.json (version 2.0)\n" +
+        "  --config <path>            Override dotnetarium.json (version 2.0)\n" +
         "  --fail                     Return 1 when findings are present\n" +
         "  -h, --help                 Show this help");
 
@@ -161,10 +164,13 @@ internal static class Program
     {
         private readonly string sourcePath = System.IO.Path.GetFullPath(path);
         public override string Path { get; } = System.IO.Path.Combine(
-            System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!, "Dotnetarium.json");
+            System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!, "dotnetarium.json");
         public override SourceText GetText(CancellationToken cancellationToken = default) =>
             SourceText.From(File.ReadAllText(sourcePath));
     }
+
+    private static bool IsConfigurationFile(string path) =>
+        string.Equals(Path.GetFileName(path), "dotnetarium.json", StringComparison.OrdinalIgnoreCase);
 
     private sealed record Options(string Target, string? SarifPath, string? ConfigPath,
         bool Fail)
