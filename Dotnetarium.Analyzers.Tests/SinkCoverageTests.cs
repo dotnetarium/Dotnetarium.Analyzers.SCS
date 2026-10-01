@@ -19,17 +19,17 @@ public sealed partial class SinkCoverageTests
     [
         new("System.Net.NetworkCredential", "DNA0009", "_ = new System.Net.NetworkCredential(\"user\", \"secret\");", true),
         new("System.UriBuilder", "DNA0009", "_ = new System.UriBuilder { Password = \"secret\" };", true),
-        new("System.Security.Cryptography.SymmetricAlgorithm", "DNA0009", "System.Security.Cryptography.Aes.Create().Key = new byte[] { 1, 2, 3 };", true),
-        new("System.Security.Cryptography.AesGcm", "DNA0009", "_ = new System.Security.Cryptography.AesGcm(new byte[] { 1, 2, 3 }, 16);", true),
-        new("System.Security.Cryptography.AesCcm", "DNA0009", "_ = new System.Security.Cryptography.AesCcm(new byte[] { 1, 2, 3 });", true),
-        new("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[] { 1, 2, 3 });", true),
-        new("Org.BouncyCastle.Crypto.Parameters.KeyParameter", "DNA0009", "_ = new Org.BouncyCastle.Crypto.Parameters.KeyParameter(new byte[] { 1, 2, 3 });", true),
-        new("NSec.Cryptography.Key", "DNA0009", "_ = NSec.Cryptography.Key.Import(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[] { 1, 2, 3 }, NSec.Cryptography.KeyBlobFormat.RawSymmetricKey);", true),
-        new("Sodium.SecretBox", "DNA0009", "_ = Sodium.SecretBox.Create(new byte[1], new byte[24], new byte[] { 1, 2, 3 });", true),
-        new("Sodium.SecretAeadAes", "DNA0009", "_ = Sodium.SecretAeadAes.Encrypt(new byte[1], new byte[12], new byte[] { 1, 2, 3 }, null);", true),
-        new("Sodium.SecretAeadChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305.Encrypt(new byte[1], new byte[8], new byte[] { 1, 2, 3 }, null);", true),
-        new("Sodium.SecretAeadChaCha20Poly1305IETF", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305IETF.Encrypt(new byte[1], new byte[12], new byte[] { 1, 2, 3 }, null);", true),
-        new("Sodium.SecretAeadXChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadXChaCha20Poly1305.Encrypt(new byte[1], new byte[24], new byte[] { 1, 2, 3 }, null);", true),
+        new("System.Security.Cryptography.SymmetricAlgorithm", "DNA0009", "System.Security.Cryptography.Aes.Create().Key = new byte[32];", true),
+        new("System.Security.Cryptography.AesGcm", "DNA0009", "_ = new System.Security.Cryptography.AesGcm(new byte[32], 16);", true),
+        new("System.Security.Cryptography.AesCcm", "DNA0009", "_ = new System.Security.Cryptography.AesCcm(new byte[32]);", true),
+        new("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[32]);", true),
+        new("Org.BouncyCastle.Crypto.Parameters.KeyParameter", "DNA0009", "_ = new Org.BouncyCastle.Crypto.Parameters.KeyParameter(new byte[32]);", true),
+        new("NSec.Cryptography.Key", "DNA0009", "_ = NSec.Cryptography.Key.Import(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[32], NSec.Cryptography.KeyBlobFormat.RawSymmetricKey);", true),
+        new("Sodium.SecretBox", "DNA0009", "_ = Sodium.SecretBox.Create(new byte[1], new byte[24], new byte[32]);", true),
+        new("Sodium.SecretAeadAes", "DNA0009", "_ = Sodium.SecretAeadAes.Encrypt(new byte[1], new byte[12], new byte[32], null);", true),
+        new("Sodium.SecretAeadChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305.Encrypt(new byte[1], new byte[8], new byte[32], null);", true),
+        new("Sodium.SecretAeadChaCha20Poly1305IETF", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305IETF.Encrypt(new byte[1], new byte[12], new byte[32], null);", true),
+        new("Sodium.SecretAeadXChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadXChaCha20Poly1305.Encrypt(new byte[1], new byte[24], new byte[32], null);", true),
         new("System.Diagnostics.Process", "DNA0002", "_ = System.Diagnostics.Process.Start(input);"),
         new("System.Diagnostics.ProcessStartInfo", "DNA0002", "_ = new System.Diagnostics.ProcessStartInfo { FileName = input };"),
         new("System.DirectoryServices.DirectorySearcher", "DNA0006", "_ = new System.DirectoryServices.DirectorySearcher(input);"),
@@ -38,11 +38,12 @@ public sealed partial class SinkCoverageTests
         new("Microsoft.AspNetCore.Mvc.ControllerBase", "DNA0005", "_ = Redirect(input);"),
         new("Microsoft.AspNetCore.Mvc.RazorPages.PageModel", "DNA0005", "_ = new TestPage().DoRedirect(input);"),
         new("Microsoft.AspNetCore.Mvc.RedirectResult", "DNA0005", "_ = new Microsoft.AspNetCore.Mvc.RedirectResult(input);"),
+        new("Microsoft.AspNetCore.Http.Results", "DNA0005", "_ = Microsoft.AspNetCore.Http.Results.Redirect(input);"),
+        new("Microsoft.AspNetCore.Http.TypedResults", "DNA0005", "_ = Microsoft.AspNetCore.Http.TypedResults.Redirect(input);"),
         new("System.IO.Directory", "DNA0004", "_ = System.IO.Directory.CreateDirectory(input);"),
         new("System.IO.File", "DNA0004", "_ = System.IO.File.OpenRead(input);"),
         new("System.IO.FileInfo", "DNA0004", "_ = new System.IO.FileInfo(input);"),
         new("System.Reflection.Assembly", "DNA0004", "_ = System.Reflection.Assembly.LoadFrom(input);"),
-        new("System.Xml.XmlReader", "DNA0004", "_ = System.Xml.XmlReader.Create(input);"),
         new("System.IO.StreamReader", "DNA0004", "_ = new System.IO.StreamReader(input);"),
         new("System.IO.StreamWriter", "DNA0004", "_ = new System.IO.StreamWriter(input);"),
         new("System.IO.FileStream", "DNA0004", "_ = new System.IO.FileStream(input, System.IO.FileMode.OpenOrCreate);"),
@@ -62,6 +63,8 @@ public sealed partial class SinkCoverageTests
         new("Dapper.CommandDefinition", "DNA0001", "_ = new Dapper.CommandDefinition(input);"),
         new("Dapper.SqlMapper", "DNA0001", "_ = Dapper.SqlMapper.Query(null!, input);"),
         new("Npgsql.NpgsqlCommand", "DNA0001", "_ = new Npgsql.NpgsqlCommand(input);"),
+        new("Microsoft.Data.SqlClient.SqlCommand", "DNA0001", "_ = new Microsoft.Data.SqlClient.SqlCommand(input);"),
+        new("MySqlConnector.MySqlCommand", "DNA0001", "_ = new MySqlConnector.MySqlCommand(input);"),
         new("Npgsql.NpgsqlBatchCommand", "DNA0001", "_ = new Npgsql.NpgsqlBatchCommand(input);"),
         new("Npgsql.NpgsqlDataSource", "DNA0001", "_ = Npgsql.NpgsqlDataSource.Create(\"Host=localhost\").CreateCommand(input);"),
         new("MySql.Data.MySqlClient.MySqlHelper", "DNA0001", "_ = MySql.Data.MySqlClient.MySqlHelper.ExecuteNonQuery(\"connection\", input);"),
@@ -87,6 +90,21 @@ public sealed partial class SinkCoverageTests
     }
 
     public static IEnumerable<object[]> SinkCases => Probes.Select(probe => new object[] { probe.Type, probe.Rule });
+
+    [Theory]
+    [InlineData("_ = new Microsoft.Data.SqlClient.SqlCommand { CommandText = input };")]
+    [InlineData("_ = new MySqlConnector.MySqlCommand { CommandText = input };")]
+    public async Task Real_sql_provider_command_text_uses_the_interface_sink(string statement)
+    {
+        var tree = CSharpSyntaxTree.ParseText(SourceFor(statement),
+            new CSharpParseOptions(LanguageVersion.Preview), "SqlProviderProbe.cs");
+        var compilation = CSharpCompilation.Create("SqlProviderProbe", [tree], References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.Empty(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var diagnostics = await compilation.WithAnalyzers([new SqlInjectionTaintAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync();
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "DNA0001");
+    }
 
     [Theory]
     [MemberData(nameof(SinkCases))]
@@ -130,7 +148,9 @@ public sealed partial class SinkCoverageTests
         {
             MetadataReference.CreateFromFile(typeof(Org.BouncyCastle.Crypto.Parameters.KeyParameter).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(NSec.Cryptography.AeadAlgorithm).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Sodium.SecretBox).Assembly.Location)
+            MetadataReference.CreateFromFile(typeof(Sodium.SecretBox).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Microsoft.Data.SqlClient.SqlCommand).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(MySqlConnector.MySqlCommand).Assembly.Location)
         }).ToArray();
 
     private static DiagnosticAnalyzer AnalyzerFor(string rule) => rule switch
@@ -142,7 +162,6 @@ public sealed partial class SinkCoverageTests
         "DNA0005" => new OpenRedirectTaintAnalyzer(),
         "DNA0006" => new LdapFilterTaintAnalyzer(),
         "DNA0007" => new XPathTaintAnalyzer(),
-        "DNA0008" => new DeserializationTaintAnalyzer(),
         "DNA0009" => new HardcodedPasswordAnalyzer(),
         "DNA0011" => new ServerSideRequestForgeryTaintAnalyzer(),
         "DNA0012" => new DynamicCodeExecutionTaintAnalyzer(),
@@ -158,7 +177,6 @@ public sealed partial class SinkCoverageTests
         TaintType.OpenRedirect => "DNA0005",
         TaintType.LdapDnInjection or TaintType.LdapFilterInjection => "DNA0006",
         TaintType.XPathInjection => "DNA0007",
-        TaintType.UnsafeDeserialization => "DNA0008",
         TaintType.HardcodedSecret => "DNA0009",
         TaintType.ServerSideRequestForgery => "DNA0011",
         TaintType.DynamicCodeExecution => "DNA0012",

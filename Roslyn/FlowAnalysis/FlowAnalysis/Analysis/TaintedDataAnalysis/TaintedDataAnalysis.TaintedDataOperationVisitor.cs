@@ -499,6 +499,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
                     if (this.IsSanitizingMethod(
                         method,
+                        visitedInstance?.Type as INamedTypeSymbol,
                         visitedArguments,
                         taintedParameterNamesCached,
                         valueContentFactory,
@@ -920,6 +921,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             /// <returns>True if the method sanitizes data (returned or as an output parameter), false otherwise.</returns>
             private bool IsSanitizingMethod(
                 IMethodSymbol method,
+                INamedTypeSymbol? receiverType,
                 ImmutableArray<IArgumentOperation> arguments,
                 ISet<string> taintedParameterNames,
                 Lazy<(PointsToAnalysisResult? p, ValueContentAnalysisResult? v)> valueContentFactory,
@@ -928,7 +930,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 taintedParameterPairs = null;
                 PointsToAnalysisResult? pointsToAnalysisResult = null;
                 ValueContentAnalysisResult? valueContentAnalysisResult = null;
-                foreach (SanitizerInfo sanitizerInfo in this.DataFlowAnalysisContext.SanitizerInfos.GetInfosForType(method.ContainingType))
+                foreach (SanitizerInfo sanitizerInfo in this.DataFlowAnalysisContext.SanitizerInfos.GetInfosForType(receiverType ?? method.ContainingType))
                 {
                     if (method.MethodKind == MethodKind.Constructor
                         && sanitizerInfo.IsConstructorSanitizing)

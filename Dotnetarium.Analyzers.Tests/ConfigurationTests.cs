@@ -16,6 +16,10 @@ public sealed class ConfigurationTests
         Assert.DoesNotContain(config.Sinks, sink => sink.Type.Contains("BinaryFormatter", StringComparison.Ordinal));
         Assert.DoesNotContain(config.Sinks, sink => sink.Type.StartsWith("System.Web.", StringComparison.Ordinal));
         Assert.DoesNotContain(config.TaintSources, source => source.Type.StartsWith("System.Web.", StringComparison.Ordinal));
+        Assert.DoesNotContain(config.TaintSources, source => source.Type == "Microsoft.EntityFrameworkCore.DbContext");
+        Assert.DoesNotContain(config.Sinks, sink => sink.Type == "System.Xml.XmlReader");
+        var context = Assert.Single(config.TaintSources, source => source.Type == "Microsoft.AspNetCore.Http.HttpContext");
+        Assert.Equal(["Request"], context.Properties);
     }
 
     [Fact]

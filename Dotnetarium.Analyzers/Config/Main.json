@@ -112,12 +112,6 @@
       "PreserveTaintOnConversion": true
     },
     {
-      "Type": "Microsoft.EntityFrameworkCore.DbContext"
-    },
-    {
-      "Type": "Microsoft.AspNetCore.Routing.RouteValueDictionary"
-    },
-    {
       "Type": "System.Console",
       "Methods": [
         "ReadLine"
@@ -154,21 +148,13 @@
     {
       "Type": "Microsoft.AspNetCore.Http.HttpContext",
       "Properties": [
-        "Items",
-        "Request",
-        "Response",
-        "User"
+        "Request"
       ]
     },
     {
       "Type": "Microsoft.AspNetCore.Http.DefaultHttpContext",
       "Properties": [
-        "HttpContext",
-        "Items",
-        "Request",
-        "Response",
-        "TraceIdentifier",
-        "User"
+        "Request"
       ]
     },
     {
@@ -196,15 +182,11 @@
         "Form",
         "Headers",
         "Host",
-        "HttpContext",
-        "Method",
         "Path",
         "PathBase",
-        "Protocol",
         "Query",
         "QueryString",
-        "RouteValues",
-        "Scheme"
+        "RouteValues"
       ],
       "Methods": [
         "ReadFormAsync"
@@ -257,27 +239,6 @@
       ]
     },
     {
-      "Type": "System.Uri",
-      "TaintTypes": [
-        "OpenRedirect"
-      ],
-      "Methods": [
-        {
-          "Name": "TryCreate",
-          "Condition": [
-            {
-              "1": 2
-            }
-          ],
-          "InOut": [
-            {
-              "uriString": "result"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "Type": "Microsoft.AspNetCore.Mvc.IUrlHelper",
       "TaintTypes": [
         "OpenRedirect"
@@ -285,14 +246,6 @@
       "Methods": [
         {
           "Name": "RouteUrl"
-        },
-        {
-          "Name": "IsLocalUrl",
-          "InOut": [
-            {
-              "url": "url"
-            }
-          ]
         }
       ]
     },
@@ -321,18 +274,6 @@
         },
         {
           "Name": "HtmlFormUrlEncode"
-        },
-        {
-          "Name": "UrlEncode"
-        },
-        {
-          "Name": "UrlPathEncode"
-        },
-        {
-          "Name": "XmlAttributeEncode"
-        },
-        {
-          "Name": "XmlEncode"
         }
       ]
     },
@@ -350,18 +291,6 @@
         },
         {
           "Name": "HtmlFormUrlEncode"
-        },
-        {
-          "Name": "UrlEncode"
-        },
-        {
-          "Name": "UrlPathEncode"
-        },
-        {
-          "Name": "XmlAttributeEncode"
-        },
-        {
-          "Name": "XmlEncode"
         }
       ]
     },
@@ -380,7 +309,7 @@
       ]
     },
     {
-      "Type": "System.Text.Encodings.Web.TextEncoder",
+      "Type": "System.Text.Encodings.Web.HtmlEncoder",
       "TaintTypes": [
         "CrossSiteScripting"
       ],
@@ -1321,6 +1250,34 @@
       ]
     },
     {
+      "Type": "Microsoft.AspNetCore.Http.Results",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "Redirect",
+          "Arguments": [
+            "url"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.TypedResults",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "Redirect",
+          "Arguments": [
+            "url"
+          ]
+        }
+      ]
+    },
+    {
       "Type": "System.IO.Directory",
       "TaintTypes": [
         "PathEscape"
@@ -1638,20 +1595,6 @@
           "Name": "UnsafeLoadFrom",
           "Arguments": [
             "assemblyFile"
-          ]
-        }
-      ]
-    },
-    {
-      "Type": "System.Xml.XmlReader",
-      "TaintTypes": [
-        "PathEscape"
-      ],
-      "Methods": [
-        {
-          "Name": "Create",
-          "Arguments": [
-            "inputUri"
           ]
         }
       ]
@@ -1992,6 +1935,34 @@
       ]
     },
     {
+      "Type": "Microsoft.Data.SqlClient.SqlCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "cmdText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "MySqlConnector.MySqlCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
+    },
+    {
       "Type": "Npgsql.NpgsqlBatchCommand",
       "TaintTypes": [
         "SqlInjection"
@@ -2224,6 +2195,9 @@
             "requestUri"
           ]
         }
+      ],
+      "Properties": [
+        "RequestUri"
       ]
     },
     {
