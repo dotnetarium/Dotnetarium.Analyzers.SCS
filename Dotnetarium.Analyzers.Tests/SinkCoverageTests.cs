@@ -23,6 +23,13 @@ public sealed partial class SinkCoverageTests
         new("System.Security.Cryptography.AesGcm", "DNA0009", "_ = new System.Security.Cryptography.AesGcm(new byte[] { 1, 2, 3 }, 16);", true),
         new("System.Security.Cryptography.AesCcm", "DNA0009", "_ = new System.Security.Cryptography.AesCcm(new byte[] { 1, 2, 3 });", true),
         new("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[] { 1, 2, 3 });", true),
+        new("Org.BouncyCastle.Crypto.Parameters.KeyParameter", "DNA0009", "_ = new Org.BouncyCastle.Crypto.Parameters.KeyParameter(new byte[] { 1, 2, 3 });", true),
+        new("NSec.Cryptography.Key", "DNA0009", "_ = NSec.Cryptography.Key.Import(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[] { 1, 2, 3 }, NSec.Cryptography.KeyBlobFormat.RawSymmetricKey);", true),
+        new("Sodium.SecretBox", "DNA0009", "_ = Sodium.SecretBox.Create(new byte[1], new byte[24], new byte[] { 1, 2, 3 });", true),
+        new("Sodium.SecretAeadAes", "DNA0009", "_ = Sodium.SecretAeadAes.Encrypt(new byte[1], new byte[12], new byte[] { 1, 2, 3 }, null);", true),
+        new("Sodium.SecretAeadChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305.Encrypt(new byte[1], new byte[8], new byte[] { 1, 2, 3 }, null);", true),
+        new("Sodium.SecretAeadChaCha20Poly1305IETF", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305IETF.Encrypt(new byte[1], new byte[12], new byte[] { 1, 2, 3 }, null);", true),
+        new("Sodium.SecretAeadXChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadXChaCha20Poly1305.Encrypt(new byte[1], new byte[24], new byte[] { 1, 2, 3 }, null);", true),
         new("System.Diagnostics.Process", "DNA0002", "_ = System.Diagnostics.Process.Start(input);"),
         new("System.Diagnostics.ProcessStartInfo", "DNA0002", "_ = new System.Diagnostics.ProcessStartInfo { FileName = input };"),
         new("System.DirectoryServices.DirectorySearcher", "DNA0006", "_ = new System.DirectoryServices.DirectorySearcher(input);"),
@@ -118,7 +125,13 @@ public sealed partial class SinkCoverageTests
 
     private static readonly MetadataReference[] References =
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
-        .Select(path => MetadataReference.CreateFromFile(path)).ToArray();
+        .Select(path => MetadataReference.CreateFromFile(path))
+        .Concat(new[]
+        {
+            MetadataReference.CreateFromFile(typeof(Org.BouncyCastle.Crypto.Parameters.KeyParameter).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(NSec.Cryptography.AeadAlgorithm).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Sodium.SecretBox).Assembly.Location)
+        }).ToArray();
 
     private static DiagnosticAnalyzer AnalyzerFor(string rule) => rule switch
     {

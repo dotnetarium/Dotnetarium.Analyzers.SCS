@@ -66,10 +66,14 @@ namespace Dotnetarium.Analyzers.Taint
 
             bool IsLiteral(IOperation value)
             {
+                while (value is IConversionOperation conversion)
+                    value = conversion.Operand;
                 if (value.ConstantValue.HasValue)
                     return value.ConstantValue.Value is not null and not "";
                 if (value is IArrayCreationOperation array &&
-                    array.Initializer?.ElementValues.All(element => element.ConstantValue.HasValue) == true)
+                    (array.Initializer == null
+                        ? array.DimensionSizes.All(size => size.ConstantValue.HasValue && size.ConstantValue.Value is int length && length > 0)
+                        : array.Initializer.ElementValues.All(element => element.ConstantValue.HasValue)))
                     return true;
                 if (values.Value == null)
                     return false;

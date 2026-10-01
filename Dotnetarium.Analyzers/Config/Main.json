@@ -1111,6 +1111,61 @@
       "Methods": [{ "Name": ".ctor", "Arguments": ["key"] }]
     },
     {
+      "Type": "Org.BouncyCastle.Crypto.Parameters.KeyParameter",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [{ "Name": ".ctor", "Arguments": ["key"] }]
+    },
+    {
+      "Type": "NSec.Cryptography.Key",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [
+        { "Name": "Import", "Arguments": ["blob"] },
+        { "Name": "TryImport", "Arguments": ["blob"] }
+      ]
+    },
+    {
+      "Type": "Sodium.SecretBox",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [
+        { "Name": "Create", "Arguments": ["key"] },
+        { "Name": "CreateDetached", "Arguments": ["key"] },
+        { "Name": "Open", "Arguments": ["key"] },
+        { "Name": "OpenDetached", "Arguments": ["key"] }
+      ]
+    },
+    {
+      "Type": "Sodium.SecretAeadAes",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [
+        { "Name": "Encrypt", "Arguments": ["key"] },
+        { "Name": "Decrypt", "Arguments": ["key"] }
+      ]
+    },
+    {
+      "Type": "Sodium.SecretAeadChaCha20Poly1305",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [
+        { "Name": "Encrypt", "Arguments": ["key"] },
+        { "Name": "Decrypt", "Arguments": ["key"] }
+      ]
+    },
+    {
+      "Type": "Sodium.SecretAeadChaCha20Poly1305IETF",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [
+        { "Name": "Encrypt", "Arguments": ["key"] },
+        { "Name": "Decrypt", "Arguments": ["key"] }
+      ]
+    },
+    {
+      "Type": "Sodium.SecretAeadXChaCha20Poly1305",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [
+        { "Name": "Encrypt", "Arguments": ["key"] },
+        { "Name": "Decrypt", "Arguments": ["key"] }
+      ]
+    },
+    {
       "Type": "System.Diagnostics.Process",
       "TaintTypes": [
         "CommandInjection"

@@ -48,6 +48,7 @@ namespace Dotnetarium.Analyzers.Cryptography
         {
             var method = invocation.TargetMethod;
             var type = method.ContainingType;
+            AnalyzeLibraryInvocation(context, invocation, operations);
             if (type.ToDisplayString() == "Microsoft.AspNetCore.Cryptography.KeyDerivation.KeyDerivation" &&
                 method.Name == "Pbkdf2")
                 CheckIterations(context, invocation, Argument(invocation.Arguments, "iterationCount"));
@@ -94,6 +95,9 @@ namespace Dotnetarium.Analyzers.Cryptography
         private static void AnalyzeCreation(OperationBlockAnalysisContext context, IObjectCreationOperation creation)
         {
             var type = creation.Type as INamedTypeSymbol;
+            if (type?.ContainingNamespace.ToDisplayString() == "Org.BouncyCastle.Crypto.Engines" &&
+                (type.Name == "DesEngine" || type.Name == "DesEdeEngine" || type.Name == "RC2Engine"))
+                Report(context, DnaRuleCatalog.WeakCipher, creation, type.Name);
             if (!IsCryptoType(type)) return;
             if (IsWeakCipher(type!.Name))
                 Report(context, DnaRuleCatalog.WeakCipher, creation, type.Name);
@@ -119,6 +123,64 @@ namespace Dotnetarium.Analyzers.Cryptography
         {
             if (value?.ConstantValue.HasValue == true && value.ConstantValue.Value is int count && count < 100000)
                 Report(context, DnaRuleCatalog.WeakPbkdf2, operation, count);
+        }
+
+        private static void AnalyzeLibraryInvocation(OperationBlockAnalysisContext context,
+            IInvocationOperation invocation, IOperation[] operations)
+        {
+            var method = invocation.TargetMethod;
+            var type = method.ContainingType;
+            var fullType = type.ToDisplayString();
+
+            if (fullType == "NSec.Cryptography.AeadAlgorithm" && method.Name == "Encrypt" &&
+                Argument(invocation.Arguments, "nonce") is { } nsecNonce &&
+                IsFixedMaterial(nsecNonce, operations))
+                Report(context, DnaRuleCatalog.FixedNonce, invocation, "NSec AeadAlgorithm.Encrypt");
+
+            if (type.ContainingNamespace.ToDisplayString() == "Sodium" &&
+                ((type.Name == "SecretBox" && (method.Name == "Create" || method.Name == "CreateDetached")) ||
+                 (type.Name.StartsWith("SecretAead", StringComparison.Ordinal) && method.Name == "Encrypt")) &&
+                Argument(invocation.Arguments, "nonce") is { } sodiumNonce &&
+                IsFixedMaterial(sodiumNonce, operations))
+                Report(context, DnaRuleCatalog.FixedNonce, invocation, fullType + "." + method.Name);
+
+            if (fullType == "Org.BouncyCastle.Security.CipherUtilities" && method.Name == "GetCipher" &&
+                Argument(invocation.Arguments, "algorithm") is { } cipherName &&
+                cipherName.ConstantValue.HasValue && cipherName.ConstantValue.Value is string algorithm)
+            {
+                var parts = algorithm.ToUpperInvariant().Split('/');
+                if (parts.Length > 1 && parts[1] == "ECB")
+                    Report(context, DnaRuleCatalog.EcbMode, invocation, algorithm);
+                if (parts[0] == "DES" || parts[0] == "DESEDE" || parts[0] == "TRIPLEDES" || parts[0] == "RC2")
+                    Report(context, DnaRuleCatalog.WeakCipher, invocation, algorithm);
+            }
+
+            if (method.Name != "Init" || !fullType.StartsWith("Org.BouncyCastle.Crypto.", StringComparison.Ordinal) ||
+                Argument(invocation.Arguments, "forEncryption") is not { } encryptFlag ||
+                !encryptFlag.ConstantValue.HasValue || encryptFlag.ConstantValue.Value is not true ||
+                Argument(invocation.Arguments, "parameters") is not { } cipherParameters)
+                return;
+
+            var parameters = ResolveLocalInitializer(cipherParameters, operations);
+            if (parameters is not IObjectCreationOperation creation ||
+                creation.Type?.ContainingNamespace.ToDisplayString() != "Org.BouncyCastle.Crypto.Parameters")
+                return;
+            var ivName = creation.Type.Name == "AeadParameters" ? "nonce" :
+                creation.Type.Name == "ParametersWithIV" ? "iv" : null;
+            if (ivName != null && Argument(creation.Arguments, ivName) is { } iv && IsFixedMaterial(iv, operations))
+                Report(context, DnaRuleCatalog.FixedNonce, invocation, fullType + ".Init");
+        }
+
+        private static IOperation? ResolveLocalInitializer(IOperation value, IOperation[] operations)
+        {
+            value = Unwrap(value)!;
+            if (value is not ILocalReferenceOperation local) return value;
+            var declaration = operations.OfType<IVariableDeclaratorOperation>()
+                .FirstOrDefault(item => SymbolEqualityComparer.Default.Equals(item.Symbol, local.Local));
+            if (declaration?.Initializer == null ||
+                HasInterveningReference(local.Local, declaration.Syntax.Span.End, value.Syntax.SpanStart, operations))
+                return null;
+            return Unwrap(declaration.Initializer.Value);
         }
 
         private static bool HasFixedIvAssignment(IInvocationOperation invocation, IOperation[] operations)
