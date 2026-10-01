@@ -1,7 +1,8 @@
 # Releasing 2.x
 
-The `release/1.x` branch and 1.x tags preserve the legacy packages. The 2.x
-source of truth is `main`. Both packages use the same version.
+The `release/1.x` branch and 1.x tags remain available for VB.NET and .NET
+Framework 4.8 projects. New features go to 2.x, whose source of truth is
+`main`. Both 2.x packages use the same version.
 
 ## One-time NuGet setup
 
@@ -36,6 +37,3 @@ source of truth is `main`. Both packages use the same version.
    credential, publishes both packages, and adds
    the `.nupkg` files to the GitHub release. Verify both package pages and a
    fresh `dotnet tool install --global dotnetarium` after indexing.
-5. After the new packages are available, deprecate the 1.x package IDs on
-   NuGet.org as legacy and point each one to its 2.x replacement. Leave the
-   old packages listed so existing consumers can still find them.

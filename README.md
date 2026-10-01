@@ -56,7 +56,9 @@ dotnet run --project Dotnetarium.Tool/Dotnetarium.Tool.csproj -- MyApp.sln --sar
 
 ## Moving from 1.x
 
-Version 2 replaces the `Dotnetarium.Analyzers.SCS` package with `Dotnetarium.Analyzers` and the `dotnetarium-scs` command with `dotnetarium`. Rule IDs now use the `DNA` prefix; update any `.editorconfig` settings and SARIF filters. Use `dotnetarium.json` in place of legacy YAML rule extensions. Version 2 supports C# on modern .NET; the old .NET Framework and Visual Basic line remains on [`release/1.x`](https://github.com/dotnetarium/dotnetarium/tree/release/1.x).
+New features go to 2.x. Version [1.3.0](https://github.com/dotnetarium/dotnetarium/releases/tag/v1.3.0) remains available for VB.NET and .NET Framework 4.8 projects on [`release/1.x`](https://github.com/dotnetarium/dotnetarium/tree/release/1.x). Version 2 supports C# projects targeting .NET 8 or 10.
+
+To move a supported C# project to 2.x, replace the `Dotnetarium.Analyzers.SCS` package with `Dotnetarium.Analyzers` and the `dotnetarium-scs` command with `dotnetarium`. Rule IDs now use the `DNA` prefix; update any `.editorconfig` settings and SARIF filters. Use `dotnetarium.json` in place of YAML rule extensions.
 
 ## About this repository
 
