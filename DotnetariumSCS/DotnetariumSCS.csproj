@@ -38,6 +38,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DotnetariumSCS.Tests.V2" />
     <InternalsVisibleTo Include="Dotnetarium.Tool" />
+    <InternalsVisibleTo Include="ModernSinkSmoke" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1974,18 +1974,6 @@
           ]
         },
         {
-          "Name": "ExecuteSqlCommand",
-          "Arguments": [
-            "sql"
-          ]
-        },
-        {
-          "Name": "ExecuteSqlCommandAsync",
-          "Arguments": [
-            "sql"
-          ]
-        },
-        {
           "Name": "ExecuteSqlRaw",
           "Arguments": [
             "sql"
@@ -2007,12 +1995,6 @@
       "Methods": [
         {
           "Name": "FromSqlRaw",
-          "Arguments": [
-            "sql"
-          ]
-        },
-        {
-          "Name": "FromSql",
           "Arguments": [
             "sql"
           ]

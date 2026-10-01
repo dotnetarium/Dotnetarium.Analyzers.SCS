@@ -50,7 +50,7 @@ public sealed partial class SinkCoverageTests
         new("System.Xml.Schema.XmlSchemaXPath", "DNA0007", "_ = new System.Xml.Schema.XmlSchemaXPath { XPath = input };"),
         new("System.Data.IDbCommand", "DNA0001", "((System.Data.IDbCommand)null!).CommandText = input;"),
         new("MySql.Data.MySqlClient.MySqlHelper", "DNA0001", "_ = MySql.Data.MySqlClient.MySqlHelper.ExecuteNonQuery(\"connection\", input);"),
-        new("System.Data.SQLite.SQLiteCommand", "DNA0001", "_ = System.Data.SQLite.SQLiteCommand.Execute(input);"),
+        new("System.Data.SQLite.SQLiteCommand", "DNA0001", "_ = System.Data.SQLite.SQLiteCommand.Execute(input, System.Data.SQLite.SQLiteExecuteType.NonQuery, \"Data Source=:memory:;\");"),
         new("Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions", "DNA0001", "_ = Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRaw(null!, input);"),
         new("Microsoft.EntityFrameworkCore.RelationalQueryableExtensions", "DNA0001", "_ = Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.FromSqlRaw(null!, input);"),
         new("System.Net.Http.HttpClient", "DNA0011", "_ = new System.Net.Http.HttpClient().GetStringAsync(input);"),
@@ -172,15 +172,16 @@ public sealed partial class SinkCoverageTests
                 public static int ExecuteReaderAsync(string connectionString, string commandText) => 0;
                 public static int ExecuteScalar(string connectionString, string commandText) => 0;
                 public static int ExecuteScalarAsync(string connectionString, string commandText) => 0;
-                public static int UpdateDataSet(string connectionString, string commandText) => 0;
-                public static int UpdateDataSetAsync(string connectionString, string commandText) => 0;
+                public static void UpdateDataSet(string connectionString, string commandText, System.Data.DataSet dataSet, string tableName) { }
+                public static System.Threading.Tasks.Task UpdateDataSetAsync(string connectionString, string commandText, System.Data.DataSet dataSet, string tableName) => System.Threading.Tasks.Task.CompletedTask;
             }
         }
         namespace System.Data.SQLite
         {
+            public enum SQLiteExecuteType { NonQuery }
             public sealed class SQLiteCommand
             {
-                public static int Execute(string commandText) => 0;
+                public static int Execute(string commandText, SQLiteExecuteType executeType, string connectionString) => 0;
             }
         }
         namespace Microsoft.EntityFrameworkCore
@@ -188,15 +189,12 @@ public sealed partial class SinkCoverageTests
             public static class RelationalDatabaseFacadeExtensions
             {
                 public static int SqlQueryRaw(object databaseFacade, string sql) => 0;
-                public static int ExecuteSqlCommand(object databaseFacade, string sql) => 0;
-                public static int ExecuteSqlCommandAsync(object databaseFacade, string sql) => 0;
                 public static int ExecuteSqlRaw(object databaseFacade, string sql) => 0;
                 public static int ExecuteSqlRawAsync(object databaseFacade, string sql) => 0;
             }
             public static class RelationalQueryableExtensions
             {
                 public static object FromSqlRaw(object source, string sql) => new object();
-                public static object FromSql(object source, string sql) => new object();
             }
         }
         namespace Microsoft.CodeAnalysis.CSharp.Scripting

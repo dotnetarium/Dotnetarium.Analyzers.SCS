@@ -177,12 +177,15 @@ public sealed partial class SinkCoverageTests
         yield return P("System.Xml.Schema.XmlSchemaXPath", "DNA0007", "XPath", "new System.Xml.Schema.XmlSchemaXPath().XPath = input;");
 
         yield return P("System.Data.IDbCommand", "DNA0001", "CommandText", "((System.Data.IDbCommand)null!).CommandText = input;");
-        foreach (var member in new[] { "ExecuteDataRow", "ExecuteDataRowAsync", "ExecuteDataset", "ExecuteDatasetAsync", "ExecuteNonQuery", "ExecuteNonQueryAsync", "ExecuteReader", "ExecuteReaderAsync", "ExecuteScalar", "ExecuteScalarAsync", "UpdateDataSet", "UpdateDataSetAsync" })
+        foreach (var member in new[] { "ExecuteDataRow", "ExecuteDataRowAsync", "ExecuteDataset", "ExecuteDatasetAsync", "ExecuteNonQuery", "ExecuteNonQueryAsync", "ExecuteReader", "ExecuteReaderAsync", "ExecuteScalar", "ExecuteScalarAsync" })
             yield return M("MySql.Data.MySqlClient.MySqlHelper", "DNA0001", member, $"_ = MySql.Data.MySqlClient.MySqlHelper.{member}(\"connection\", input);");
-        yield return M("System.Data.SQLite.SQLiteCommand", "DNA0001", "Execute", "_ = System.Data.SQLite.SQLiteCommand.Execute(input);");
-        foreach (var member in new[] { "SqlQueryRaw", "ExecuteSqlCommand", "ExecuteSqlCommandAsync", "ExecuteSqlRaw", "ExecuteSqlRawAsync" })
+        foreach (var member in new[] { "UpdateDataSet", "UpdateDataSetAsync" })
+            yield return M("MySql.Data.MySqlClient.MySqlHelper", "DNA0001", member,
+                $"{(member.EndsWith("Async", StringComparison.Ordinal) ? "_ = " : "")}MySql.Data.MySqlClient.MySqlHelper.{member}(\"connection\", input, new System.Data.DataSet(), \"table\");");
+        yield return M("System.Data.SQLite.SQLiteCommand", "DNA0001", "Execute", "_ = System.Data.SQLite.SQLiteCommand.Execute(input, System.Data.SQLite.SQLiteExecuteType.NonQuery, \"Data Source=:memory:;\");");
+        foreach (var member in new[] { "SqlQueryRaw", "ExecuteSqlRaw", "ExecuteSqlRawAsync" })
             yield return M("Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions", "DNA0001", member, $"_ = Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.{member}(null!, input);");
-        foreach (var member in new[] { "FromSqlRaw", "FromSql" })
+        foreach (var member in new[] { "FromSqlRaw" })
             yield return M("Microsoft.EntityFrameworkCore.RelationalQueryableExtensions", "DNA0001", member, $"_ = Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.{member}(null!, input);");
 
         foreach (var member in new[] { "GetAsync", "GetStringAsync", "GetStreamAsync", "GetByteArrayAsync", "DeleteAsync" })
