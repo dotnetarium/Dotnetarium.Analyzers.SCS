@@ -60,6 +60,7 @@ dotnet_diagnostic.DNA0010.severity = error
 The repository contains the analyzer, global tool, xUnit tests, provider and
 Razor smoke checks, and the selected Roslyn flow utilities. See the
 [architecture notes](docs/Architecture.md) for how they fit together.
+Maintainers can follow the [release instructions](docs/Releasing.md).
 
 ## License
 

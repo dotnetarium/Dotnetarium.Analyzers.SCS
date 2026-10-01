@@ -1,0 +1,65 @@
+name: Publish 2.x packages
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'v2.')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Verify package versions match the tag
+        shell: pwsh
+        run: |
+          $version = '${{ github.event.release.tag_name }}'.Substring(1)
+          $analyzer = [xml](Get-Content Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj -Raw)
+          $tool = [xml](Get-Content Dotnetarium.Tool/Dotnetarium.Tool.csproj -Raw)
+          if ($analyzer.SelectSingleNode('//PackageVersion').InnerText -ne $version -or
+              $tool.SelectSingleNode('//Version').InnerText -ne $version) {
+            throw "Package versions must match release tag $version."
+          }
+      - name: Test and pack
+        shell: pwsh
+        run: |
+          dotnet test Dotnetarium.sln -c Release -p:RunAnalyzers=false --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet pack Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj -c Release -p:RunAnalyzers=false -o artifacts --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet pack Dotnetarium.Tool/Dotnetarium.Tool.csproj -c Release -p:RunAnalyzers=false -o artifacts --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/CliSmoke/Test.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: dbalikhin
+      - name: Publish to NuGet.org
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          Get-ChildItem artifacts -Filter '*.nupkg' | ForEach-Object {
+            dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Attach packages to GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Get-ChildItem artifacts -Filter '*.nupkg' | ForEach-Object {
+            gh release upload '${{ github.event.release.tag_name }}' $_.FullName --clobber
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
