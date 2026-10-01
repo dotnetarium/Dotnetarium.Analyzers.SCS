@@ -1,6 +1,6 @@
 # Rule configuration in 2.x
 
-The built-in models live in `DotnetariumSCS/Config/Main.json`. Projects can extend them with `Dotnetarium.json`. The global tool accepts the same file through `--config`. The analyzer reads it when the project includes:
+The built-in models live in `Dotnetarium.Analyzers/Config/Main.json`. Projects can extend them with `Dotnetarium.json`. The global tool accepts the same file through `--config`. The analyzer reads it when the project includes:
 
 ```xml
 <ItemGroup>

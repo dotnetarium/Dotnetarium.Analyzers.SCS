@@ -41,7 +41,7 @@ namespace Dotnetarium.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true,
                 description: $"CWE-{cwe}. Review the reported data flow and use a context-appropriate mitigation.",
-                helpLinkUri: $"https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS/blob/2.0/docs/rules/{id}.md",
+                helpLinkUri: $"https://github.com/dotnetarium/dotnetarium/blob/main/docs/rules/{id}.md",
                 customTags: new[] { $"CWE-{cwe}" });
     }
 }

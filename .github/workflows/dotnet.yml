@@ -1,10 +1,10 @@
-name: Build and test 2.x
+name: Build and test
 
 on:
   push:
-    branches: ["2.0"]
+    branches: ["main", "2.0"]
   pull_request:
-    branches: ["2.0"]
+    branches: ["main", "2.0"]
 
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Build and run unit tests
-        run: dotnet test Dotnetarium.Analyzers.SCS.sln -c Release -p:RunAnalyzers=false
+        run: dotnet test Dotnetarium.sln -c Release -p:RunAnalyzers=false
       - name: Test modern sinks
         run: dotnet run --project tests/ModernSinkSmoke/ModernSinkSmoke.csproj -c Release -p:RunAnalyzers=false
       - name: Test Razor and Blazor flows
@@ -25,7 +25,7 @@ jobs:
         run: ./tests/RazorSmoke/Test.ps1
       - name: Pack analyzer and global tool
         run: |
-          dotnet pack DotnetariumSCS/DotnetariumSCS.csproj -c Release -p:RunAnalyzers=false -o artifacts
+          dotnet pack Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj -c Release -p:RunAnalyzers=false -o artifacts
           dotnet pack Dotnetarium.Tool/Dotnetarium.Tool.csproj -c Release -p:RunAnalyzers=false -o artifacts
       - name: Scan through installed global tool
         shell: pwsh

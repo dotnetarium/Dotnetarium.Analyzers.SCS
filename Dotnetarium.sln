@@ -1,9 +1,9 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34701.34
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotnetariumSCS", "DotnetariumSCS\DotnetariumSCS.csproj", "{32A5C692-B663-4BC5-88A7-F4C965493F89}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dotnetarium.Analyzers", "Dotnetarium.Analyzers\Dotnetarium.Analyzers.csproj", "{32A5C692-B663-4BC5-88A7-F4C965493F89}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Roslyn", "Roslyn", "{34B11A26-6373-492D-ACCC-F11D1E4FC16F}"
 EndProject
@@ -15,7 +15,7 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Workspaces.Utilities", "Ros
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dotnetarium.Tool", "Dotnetarium.Tool\Dotnetarium.Tool.csproj", "{928FD5A6-196F-474A-89FB-26E50BD5DA76}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotnetariumSCS.Tests.V2", "DotnetariumSCS.Tests.V2\DotnetariumSCS.Tests.V2.csproj", "{6115F18B-2AAE-4BE3-AB26-849D4287D644}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dotnetarium.Analyzers.Tests", "Dotnetarium.Analyzers.Tests\Dotnetarium.Analyzers.Tests.csproj", "{6115F18B-2AAE-4BE3-AB26-849D4287D644}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

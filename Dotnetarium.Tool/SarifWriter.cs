@@ -42,7 +42,7 @@ internal static class SarifWriter
                 ["driver"] = new JsonObject
                 {
                     ["name"] = "Dotnetarium",
-                    ["informationUri"] = "https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS",
+                    ["informationUri"] = "https://github.com/dotnetarium/dotnetarium",
                     ["rules"] = new JsonArray(rules.Select(rule => (JsonNode?)rule).ToArray())
                 }
             },

@@ -13,7 +13,7 @@ namespace Dotnetarium.Config
     internal sealed class ConfigurationReader
     {
         private const string ProjectFileName = "Dotnetarium.json";
-        private const string EmbeddedFileName = "DotnetariumSCS.Config.Main.json";
+        private const string EmbeddedFileName = "Dotnetarium.Analyzers.Config.Main.json";
         private static readonly JsonSerializerOptions Options = CreateOptions();
 
         private static JsonSerializerOptions CreateOptions()

@@ -5,7 +5,7 @@ $feed = Join-Path $scratch 'feed'
 $packages = Join-Path $scratch 'packages'
 New-Item -ItemType Directory -Path $feed, $packages -Force | Out-Null
 
-$analyzer = Join-Path $root 'DotnetariumSCS/DotnetariumSCS.csproj'
+$analyzer = Join-Path $root 'Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj'
 & dotnet build $analyzer -c Release --nologo -v quiet -clp:ErrorsOnly -p:PackageVersion=0.0.0-razor-smoke
 if ($LASTEXITCODE -ne 0) { throw 'Analyzer build failed.' }
 & dotnet pack $analyzer -c Release --no-build --nologo -v quiet -p:PackageVersion=0.0.0-razor-smoke -o $feed

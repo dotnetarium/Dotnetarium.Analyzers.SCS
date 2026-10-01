@@ -161,7 +161,7 @@ internal static class Program
     }
 
     private static void PrintUsage() => Console.WriteLine(
-        "Usage: dotnetarium-scs <solution.sln|project.csproj> [options]\n" +
+        "Usage: dotnetarium <solution.sln|project.csproj> [options]\n" +
         "  -x, --sarif <path>          Write SARIF 2.1.0\n" +
         "  -c, --config <path>         Load Dotnetarium.json (version 2.0)\n" +
         "  --sdk-path <path>          Use a specific .NET SDK MSBuild directory\n" +

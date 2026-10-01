@@ -1,12 +1,12 @@
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $feed = Join-Path $root 'artifacts'
-$analyzerSpec = [xml](Get-Content -LiteralPath (Join-Path $root 'DotnetariumSCS/DotnetariumSCS.csproj') -Raw)
+$analyzerSpec = [xml](Get-Content -LiteralPath (Join-Path $root 'Dotnetarium.Analyzers/Dotnetarium.Analyzers.csproj') -Raw)
 $toolSpec = [xml](Get-Content -LiteralPath (Join-Path $root 'Dotnetarium.Tool/Dotnetarium.Tool.csproj') -Raw)
 $analyzerVersion = $analyzerSpec.SelectSingleNode('//PackageVersion').InnerText
 $toolVersion = $toolSpec.SelectSingleNode('//Version').InnerText
-if (-not (Test-Path -LiteralPath (Join-Path $feed "dotnetarium-scs.$toolVersion.nupkg")) -or
-    -not (Test-Path -LiteralPath (Join-Path $feed "Dotnetarium.Analyzers.SCS.$analyzerVersion.nupkg"))) {
+if (-not (Test-Path -LiteralPath (Join-Path $feed "dotnetarium.$toolVersion.nupkg")) -or
+    -not (Test-Path -LiteralPath (Join-Path $feed "Dotnetarium.Analyzers.$analyzerVersion.nupkg"))) {
     throw 'Pack both 2.x packages into artifacts before running this smoke check.'
 }
 
@@ -61,7 +61,7 @@ namespace Newtonsoft.Json
 '@ | Set-Content -LiteralPath (Join-Path $projectPath 'Class1.cs') -Encoding utf8
 $project = Join-Path $projectPath 'CliSmoke.csproj'
 $projectXml = Get-Content -LiteralPath $project -Raw
-$packageReference = "  <ItemGroup><PackageReference Include=`"Dotnetarium.Analyzers.SCS`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
+$packageReference = "  <ItemGroup><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
 $projectXml.Replace('</Project>', "$packageReference`n</Project>") |
     Set-Content -LiteralPath $project -Encoding utf8
 $nugetConfig = Join-Path $scratch 'NuGet.Config'
@@ -78,9 +78,9 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
     throw 'Packaged analyzer did not report the expected .NET 10 findings.'
 }
 
-& dotnet tool install dotnetarium-scs --version $toolVersion --tool-path $toolPath --add-source $feed --ignore-failed-sources --no-cache
+& dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --add-source $feed --ignore-failed-sources --no-cache
 if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
-$tool = Join-Path $toolPath 'dotnetarium-scs.exe'
+$tool = Join-Path $toolPath 'dotnetarium.exe'
 $sdkRoot = Split-Path (Get-Command dotnet).Source -Parent
 $sdkVersion = (& dotnet --version).Trim()
 $sdkPath = Join-Path $sdkRoot ('sdk/' + $sdkVersion)

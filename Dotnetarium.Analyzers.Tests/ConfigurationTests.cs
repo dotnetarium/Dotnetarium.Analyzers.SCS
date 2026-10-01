@@ -4,7 +4,7 @@ using Dotnetarium.Config;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-namespace DotnetariumSCS.Tests.V2;
+namespace Dotnetarium.Analyzers.Tests;
 
 public sealed class ConfigurationTests
 {

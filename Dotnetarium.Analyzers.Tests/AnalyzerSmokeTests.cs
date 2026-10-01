@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace DotnetariumSCS.Tests.V2;
+namespace Dotnetarium.Analyzers.Tests;
 
 public sealed class AnalyzerSmokeTests
 {

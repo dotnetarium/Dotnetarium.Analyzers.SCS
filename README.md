@@ -1,12 +1,15 @@
 # Dotnetarium 2.x
 
-Dotnetarium finds security issues in modern C# applications. The NuGet analyzer runs during builds; the `dotnetarium-scs` global tool scans a project or solution and can write SARIF 2.1.0. Both use the same DNA rules and configuration.
+Dotnetarium finds security issues in modern C# applications. The NuGet analyzer runs during builds; the `dotnetarium` global tool scans a project or solution and can write SARIF 2.1.0. Both use the same DNA rules and configuration.
 
 ## Install
 
+The 2.0 packages are being prepared. These commands apply once the prerelease
+packages are published to NuGet.org.
+
 ```powershell
-dotnet add package Dotnetarium.Analyzers.SCS --version 2.0.0-alpha.1
-dotnet tool install --global dotnetarium-scs --version 2.0.0-alpha.1
+dotnet add package Dotnetarium.Analyzers --version 2.0.0-alpha.1
+dotnet tool install --global dotnetarium --version 2.0.0-alpha.1
 ```
 
 The analyzer targets `netstandard2.0` for the Roslyn host and uses Roslyn 5.0, which requires Visual Studio 2026 (18.0) or a compatible .NET SDK. The global tool requires the .NET 10 runtime and an SDK capable of loading the target project. The tool scans C# projects targeting .NET 8 or .NET 10; Visual Basic and .NET Framework support ended with 1.x.
@@ -14,10 +17,19 @@ The analyzer targets `netstandard2.0` for the Roslyn host and uses Roslyn 5.0, w
 ## Scan
 
 ```powershell
-dotnetarium-scs MyApp.sln --sarif results.sarif --cwe --fail-any-warn
+dotnetarium MyApp.sln --sarif results.sarif --cwe --fail-any-warn
 ```
 
-SARIF source paths are relative to the solution or project directory by default. `--sarif-absolute-paths` retains absolute file URIs for consumers that require them. `--sdk-path` selects a versioned SDK directory when automatic SDK discovery cannot load a project. Run `dotnetarium-scs --help` for all options.
+SARIF source paths are relative to the solution or project directory by default. `--sarif-absolute-paths` retains absolute file URIs for consumers that require them. `--sdk-path` selects a versioned SDK directory when automatic SDK discovery cannot load a project. Run `dotnetarium --help` for all options.
+
+## Moving from 1.x
+
+The 1.x line is preserved on the `release/1.x` branch. Version 2 uses new
+package IDs and a new command: replace `Dotnetarium.Analyzers.SCS` with
+`Dotnetarium.Analyzers` and `dotnetarium-scs` with `dotnetarium`. Rules have new
+`DNA` IDs, so update `.editorconfig` and any SARIF filters. Replace legacy YAML
+rule extensions with `Dotnetarium.json`. The 2.x analyzer supports modern C#;
+the tool needs a .NET 10 runtime and scans .NET 8 or .NET 10 projects.
 
 ## Rules
 
@@ -44,6 +56,10 @@ Add `Dotnetarium.json` as an `AdditionalFiles` item to extend the built-in sourc
 [*.cs]
 dotnet_diagnostic.DNA0010.severity = error
 ```
+
+The repository contains the analyzer, global tool, xUnit tests, provider and
+Razor smoke checks, and the selected Roslyn flow utilities. See the
+[architecture notes](docs/Architecture.md) for how they fit together.
 
 ## License
 

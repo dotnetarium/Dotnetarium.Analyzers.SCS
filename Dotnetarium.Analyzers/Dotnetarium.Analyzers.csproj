@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -12,15 +12,15 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>Dotnetarium.Analyzers.SCS</PackageId>
+    <PackageId>Dotnetarium.Analyzers</PackageId>
     <PackageVersion>2.0.0-alpha.1</PackageVersion>
     <Authors>Dmitry Balikhin</Authors>
-    <PackageProjectUrl>https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/dotnetarium/dotnetarium</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <RepositoryUrl>https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS</RepositoryUrl>
+    <RepositoryUrl>https://github.com/dotnetarium/dotnetarium</RepositoryUrl>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Description>Security analysis for modern C# with configurable taint models</Description>
-    <PackageReleaseNotes>Check details here: https://github.com/dotnetarium/Dotnetarium.Analyzers.SCS/releases</PackageReleaseNotes>
+    <PackageReleaseNotes>Check details here: https://github.com/dotnetarium/dotnetarium/releases</PackageReleaseNotes>
     <Copyright>© Dotnetarium</Copyright>
     <PackageTags>Dotnetarium Security StaticAnalysis Roslyn CSharp TaintAnalysis SARIF</PackageTags>
     <DevelopmentDependency>true</DevelopmentDependency>
@@ -32,11 +32,11 @@
   </PropertyGroup>
   
   <PropertyGroup>
-    <AssemblyName>DotnetariumSCS</AssemblyName>
+    <AssemblyName>Dotnetarium.Analyzers</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="DotnetariumSCS.Tests.V2" />
+    <InternalsVisibleTo Include="Dotnetarium.Analyzers.Tests" />
     <InternalsVisibleTo Include="Dotnetarium.Tool" />
     <InternalsVisibleTo Include="ModernSinkSmoke" />
   </ItemGroup>
@@ -80,10 +80,10 @@
 
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
-      <TfmSpecificPackageFile Include="$(OutputPath)\DotnetariumSCS.dll" PackagePath="analyzers/dotnet" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\Dotnetarium.Analyzers.dll" PackagePath="analyzers/dotnet" />
       <TfmSpecificPackageFile Include="$(OutputPath)\System.Text.Json.dll" PackagePath="analyzers/dotnet" />
       <TfmSpecificPackageFile Include="$(OutputPath)\Microsoft.Bcl.AsyncInterfaces.dll;$(OutputPath)\System.Buffers.dll;$(OutputPath)\System.IO.Pipelines.dll;$(OutputPath)\System.Memory.dll;$(OutputPath)\System.Numerics.Vectors.dll;$(OutputPath)\System.Runtime.CompilerServices.Unsafe.dll;$(OutputPath)\System.Text.Encodings.Web.dll;$(OutputPath)\System.Threading.Tasks.Extensions.dll" PackagePath="analyzers/dotnet" />
-      <TfmSpecificPackageFile Include="$(OutputPath)\DotnetariumSCS.dll" PackagePath="lib/netstandard2.0" />
+      <TfmSpecificPackageFile Include="$(OutputPath)\Dotnetarium.Analyzers.dll" PackagePath="lib/netstandard2.0" />
       <TfmSpecificPackageFile Include="$(OutputPath)\System.Text.Json.dll" PackagePath="lib/netstandard2.0" />
       <TfmSpecificPackageFile Include="$(OutputPath)\Microsoft.Bcl.AsyncInterfaces.dll;$(OutputPath)\System.Buffers.dll;$(OutputPath)\System.IO.Pipelines.dll;$(OutputPath)\System.Memory.dll;$(OutputPath)\System.Numerics.Vectors.dll;$(OutputPath)\System.Runtime.CompilerServices.Unsafe.dll;$(OutputPath)\System.Text.Encodings.Web.dll;$(OutputPath)\System.Threading.Tasks.Extensions.dll" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
