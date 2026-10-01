@@ -4,8 +4,7 @@ Dotnetarium finds security issues in modern C# applications. The NuGet analyzer 
 
 ## Install
 
-The 2.0 packages are being prepared. These commands apply once the
-packages are published to NuGet.org.
+Once version 2.0.0 is available on NuGet.org, install both packages:
 
 ```powershell
 dotnet add package Dotnetarium.Analyzers --version 2.0.0
