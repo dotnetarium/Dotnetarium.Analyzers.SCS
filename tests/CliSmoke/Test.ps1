@@ -122,5 +122,14 @@ if ($LASTEXITCODE -ne 2 -or -not ($badOutput -match 'Invalid Dotnetarium.json'))
     throw 'CLI did not reject an invalid JSON rule field.'
 }
 
-'Analyzer NuGet package and global tool scan .NET 8/10; custom JSON and relative SARIF checks passed.' | Write-Output
+Add-Content -LiteralPath (Join-Path $projectPath 'Class1.cs') -Value 'class Broken { MissingType value; }'
+$incompleteSarif = Join-Path $scratch 'incomplete.sarif'
+$invalidProjectOutput = & $tool $project --sdk-path $sdkPath --sarif $incompleteSarif 2>&1
+if ($LASTEXITCODE -ne 2 -or -not ($invalidProjectOutput -match 'CS0246') -or
+    -not ($invalidProjectOutput -match 'Scan incomplete') -or
+    (Test-Path -LiteralPath $incompleteSarif)) {
+    throw 'CLI did not explain incomplete scanning of a project with compiler errors.'
+}
+
+'Analyzer NuGet package and global tool scan .NET 8/10; custom JSON, relative SARIF, and compiler error checks passed.' | Write-Output
 exit 0

@@ -98,12 +98,14 @@ internal static class Program
                         .ToImmutableArray();
                 var analyzerOptions = new AnalyzerOptions(additionalFiles, project.AnalyzerOptions.AnalyzerConfigOptionsProvider);
                 var result = await compilation.WithAnalyzers(analyzers, analyzerOptions).GetAllDiagnosticsAsync();
-                compilerErrors |= result.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error &&
-                                                           !diagnostic.Id.StartsWith("DNA", StringComparison.Ordinal));
-                compilerErrors |= result.Any(diagnostic => diagnostic.Id == "AD0001");
+                var projectErrors = result.Where(diagnostic =>
+                    diagnostic.Id == "AD0001" ||
+                    (diagnostic.Severity == DiagnosticSeverity.Error &&
+                     !diagnostic.Id.StartsWith("DNA", StringComparison.Ordinal))).ToArray();
+                compilerErrors |= projectErrors.Length > 0;
                 diagnostics.AddRange(result.Where(diagnostic => diagnostic.Id.StartsWith("DNA", StringComparison.Ordinal)));
-                foreach (var error in result.Where(diagnostic => diagnostic.Id == "AD0001"))
-                    Console.Error.WriteLine(error);
+                foreach (var error in projectErrors)
+                    Console.Error.WriteLine($"{project.Name}: {error}");
             }
 
             foreach (var error in workspaceErrors.Distinct(StringComparer.Ordinal))
@@ -136,11 +138,14 @@ internal static class Program
                 Console.WriteLine($"{path}({line.StartLinePosition.Line + 1},{line.StartLinePosition.Character + 1}): {diagnostic.Id}{cwe}: {diagnostic.GetMessage()}");
             }
 
+            Console.WriteLine($"{findings.Length} security finding(s){(compilerErrors ? " (partial scan)" : string.Empty)}.");
+            if (compilerErrors)
+            {
+                Console.Error.WriteLine("Scan incomplete: project or workspace errors occurred.");
+                return 2;
+            }
             if (options.SarifPath != null)
                 await SarifWriter.WriteAsync(options.SarifPath, target, findings, options.AbsolutePaths);
-
-            Console.WriteLine($"{findings.Length} security finding(s).");
-            if (compilerErrors) return 2;
             return options.FailOnFindings && findings.Length > 0 ? 1 : 0;
         }
         catch (System.Text.Json.JsonException error)
