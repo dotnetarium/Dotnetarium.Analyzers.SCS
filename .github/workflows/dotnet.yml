@@ -2,9 +2,9 @@ name: Build and test 2.x
 
 on:
   push:
-    branches: ["2.0", "modernization-2.0"]
+    branches: ["2.0"]
   pull_request:
-    branches: ["2.0", "main"]
+    branches: ["2.0"]
 
 jobs:
   build:
