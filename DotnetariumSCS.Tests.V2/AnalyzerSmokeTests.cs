@@ -141,6 +141,72 @@ public sealed class AnalyzerSmokeTests
     }
 
     [Fact]
+    public async Task Reports_untrusted_xpath_expression()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using System.Xml;
+            public class Demo
+            {
+                public void Run(XmlDocument document)
+                {
+                    var expression = Console.ReadLine()!;
+                    _ = document.SelectSingleNode(expression);
+                }
+            }
+            """, new XPathTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0007"));
+    }
+
+    [Fact]
+    public async Task Reports_untrusted_stream_in_unsafe_deserializer()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System.IO;
+            using System.Net.Sockets;
+            namespace System.Runtime.Serialization
+            {
+                public class NetDataContractSerializer
+                {
+                    public object Deserialize(Stream stream) => new object();
+                }
+            }
+            public class Demo
+            {
+                public object Run(TcpClient client) =>
+                    new System.Runtime.Serialization.NetDataContractSerializer()
+                        .Deserialize(client.GetStream());
+            }
+            """, new DeserializationTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0008"));
+    }
+
+    [Fact]
+    public async Task Reports_untrusted_dynamic_csharp_code()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using System.Threading.Tasks;
+            namespace Microsoft.CodeAnalysis.CSharp.Scripting
+            {
+                public static class CSharpScript
+                {
+                    public static Task<object> EvaluateAsync(string code) => Task.FromResult(new object());
+                }
+            }
+            public class Demo
+            {
+                public Task<object> Run() =>
+                    Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.EvaluateAsync(Console.ReadLine()!);
+            }
+            """, new DynamicCodeExecutionTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0012"));
+    }
+
+    [Fact]
     public async Task Reports_hardcoded_network_credential_after_adapter_rewrite()
     {
         var diagnostics = await AnalyzeAsync("""
