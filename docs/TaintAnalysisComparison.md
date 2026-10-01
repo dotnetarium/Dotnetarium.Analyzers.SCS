@@ -1,3 +1,7 @@
+# Historical comparison
+
+This document records the 1.x upstream comparison and uses its original names and paths. The 2.x analyzer uses JSON configuration, DNA diagnostics, Roslyn 5.0, and an in-repository .NET 10 global tool. See the root README for current behavior.
+
 # Three-way taint analysis comparison
 
 This compares the updated local `dotnetarium/analyzers` reference (based on

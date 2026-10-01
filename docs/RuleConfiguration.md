@@ -1,177 +1,45 @@
-# YAML Configuration
-You need to modify the `Config/Main.yml` file to add new entry points, sources, sinks and/or sanitizers.
-Looks scary, but try to find a suitable example in the file and reuse it. 
+# Rule configuration in 2.x
 
-An attempt to provide some samples and exlain usage is below.
+The built-in models live in `DotnetariumSCS/Config/Main.json`. Projects can extend them with `Dotnetarium.json`. The global tool accepts the same file through `--config`. The analyzer reads it when the project includes:
 
-## Entry Points
-
-Define entry points to specify where untrusted data can enter your application. Here's an example configuration:
-```yml
-TaintEntryPoints:
-  System.Object:
-    Dependency:
-      - Microsoft.AspNetCore.Mvc.ControllerBase
-      - Microsoft.AspNetCore.Mvc.ApiControllerAttribute
-      - Microsoft.AspNetCore.Mvc.ControllerAttribute
-      - Microsoft.AspNetCore.Mvc.NonControllerAttribute
-      - Microsoft.AspNetCore.Mvc.NonActionAttribute
-      - Microsoft.AspNetCore.Mvc.FromServicesAttribute
-    Class:
-      Accessibility:
-        - public
-      Suffix:
-        Text: Controller
-        IncludeParent: true
-      Attributes:
-        Include:
-          - Type: Microsoft.AspNetCore.Mvc.ControllerAttribute
-          - Type: Microsoft.AspNetCore.Mvc.ApiControllerAttribute
-        Exclude:
-          - Type: Microsoft.AspNetCore.Mvc.NonControllerAttribute
-    Method:
-      Accessibility:
-        - public
-      IncludeConstructor: false
-      Static: false
-      Attributes:
-        Exclude:
-          - Type: Microsoft.AspNetCore.Mvc.NonActionAttribute
-    Parameter:
-      Attributes:
-        Exclude:
-          - Type: Microsoft.AspNetCore.Mvc.FromServicesAttribute
-
+```xml
+<ItemGroup>
+  <AdditionalFiles Include="Dotnetarium.json" />
+</ItemGroup>
 ```
 
-- `System.Object`: The root object type for defining entry points.
-- `Dependency`: Specifies dependencies that indicate the presence of an entry point.
-  - `Microsoft.AspNetCore.Mvc.ControllerBase`: Indicates dependency on `ControllerBase`.
-  - `Microsoft.AspNetCore.Mvc.ApiControllerAttribute`: Indicates the use of `ApiControllerAttribute`.
-  - Other attributes specify additional dependencies or attributes to consider.
-- `Class`: Specifies criteria for class-level entry points.
-  - `Accessibility`: Defines accessibility levels, e.g., `public`.
-  - `Suffix`: Criteria based on class name suffix.
-    - `Text`: The suffix text, e.g., `Controller`.
-    - `IncludeParent`: Whether to include parent classes.
-  - `Attributes`: Specifies attributes to include or exclude.
-    - `Include`: Attributes to include, e.g., `ControllerAttribute`.
-    - `Exclude`: Attributes to exclude, e.g., `NonControllerAttribute`.
-- `Method`: Specifies criteria for method-level entry points.
-  - `Accessibility`: Defines accessibility levels, e.g., `public`.
-  - `IncludeConstructor`: Whether to include constructors.
-  - `Static`: Whether the method should be static.
-  - `Attributes`: Specifies attributes to exclude, e.g., `NonActionAttribute`.
-- `Parameter`: Specifies criteria for method parameters.
-  - `Attributes`: Specifies attributes to exclude, e.g., `FromServicesAttribute`.
-  
-## Sources
-Specify sources to identify where potentially tainted data originates:
+The file must declare `"Version": "2.0"`. JSON property names are case insensitive; duplicate names are rejected. `TaintTypes` uses semantic names such as `SqlInjection`, `CrossSiteScripting`, `PathEscape`, `LdapFilterInjection`, and `LdapDnInjection`. These are internal model contexts and are independent of the public DNA diagnostic IDs.
 
-```yml  
-  TaintSources:
-  - Type: Microsoft.AspNetCore.Http.IFormCollection
-    IsInterface: true
-    Properties:
-      - Files
-      - Item
-  - Type: Microsoft.AspNetCore.Http.HttpRequest
-    Properties:
-      - Body
-      - BodyReader
-      - ContentType
-      - Cookies
-      - Form
-      - Headers
-      - Host
-      - HttpContext
-      - Method
-      - Path
-      - PathBase
-      - Protocol
-      - Query
-      - QueryString
-      - RouteValues
-      - Scheme
-    Methods:
-      - ReadFormAsync
-```
-  
-- `Type`: The type of the source.
-  - `Microsoft.AspNetCore.Http.IFormCollection`: An interface representing form collections.
-    - `IsInterface`: Indicates the type is an interface.
-    - `Properties`: Lists properties considered as sources of tainted data.
-      - `Files`: Represents form files.
-      - `Item`: Represents form items.
-  - `Microsoft.AspNetCore.Http.HttpRequest`: Represents HTTP request data.
-    - `Properties`: Lists properties of `HttpRequest`.
-      - `Body`: The request body.
-      - `BodyReader`: The body reader.
-      - `ContentType`: The content type.
-      - Other properties specify additional sources of tainted data.
-    - `Methods`: Lists methods of `HttpRequest`.
-      - `ReadFormAsync`: Asynchronously reads form data.
-
-## Sanitizer
-Define sanitizers to identify methods that clean tainted data:
- 
-```yml 
-Sanitizers:
-  - Type: Microsoft.Security.Application.Encoder
-    TaintTypes:
-      - SCS0026
-    Methods:
-      - Name: LdapDistinguishedNameEncode
-  - Type: System.Data.IDbCommand
-    TaintTypes:
-      - SCS0002
-    IsAnyStringParameterInConstructorASink: true
-    IsInterface: true
-    Properties:
-      - CommandText
-
+```json
+{
+  "Version": "2.0",
+  "TaintSources": [
+    {
+      "Type": "Example.Input",
+      "Methods": ["Read"]
+    }
+  ],
+  "Sinks": [
+    {
+      "Type": "Example.Query",
+      "TaintTypes": ["SqlInjection"],
+      "Methods": [
+        { "Name": "Execute", "Arguments": ["query"] }
+      ]
+    }
+  ],
+  "Sanitizers": [
+    {
+      "Type": "Example.SqlEscaping",
+      "TaintTypes": ["SqlInjection"],
+      "Methods": [{ "Name": "Escape" }]
+    }
+  ]
+}
 ```
 
-- `Type`: The type of the sanitizer.
-  - `Microsoft.Security.Application.Encoder`: Represents the `Encoder` class.
-    - `TaintTypes`: Specifies applicable analyzer rule IDs.
-      - `SCS0026`: An example rule ID.
-    - `Methods`: Lists methods that sanitize data.
-      - `Name: LdapDistinguishedNameEncode`: Method that encodes LDAP distinguished names.
-  - `System.Data.IDbCommand`: Represents database command interfaces.
-    - `TaintTypes`: Specifies applicable analyzer rule IDs.
-      - `SCS0002`: An example rule ID.
-    - `IsAnyStringParameterInConstructorASink`: Indicates if any string parameter in the constructor is a sink.
-    - `IsInterface`: Indicates the type is an interface.
-    - `Properties`: Lists properties of the type.
-      - `CommandText`: Represents the command text property.
+`Type` is the fully qualified metadata type. `IsInterface` can be set on source or sink models. `Properties` and `Methods` name members, while a sink method's `Arguments` names its risky parameters. `TaintTypes` limits a model to selected contexts; when omitted from a source, it applies to all taint contexts. A sanitizer applies only to its listed context, so LDAP filter escaping must not clear a distinguished-name flow or vice versa. For more complex entry points, transfers, and conditional sanitizers, follow the examples in `Main.json`.
 
-## Sinks
+Project models add to the built-ins. Configure severity and suppression with `.editorconfig` using `dotnet_diagnostic.DNAxxxx.severity`. A rule ID does not appear in `Dotnetarium.json` because the analyzer maps internal contexts to DNA diagnostics.
 
-Identify sinks to specify where tainted data could cause harm:
-```yml
-Sinks:
-  - Type: System.Data.Linq.DataContext
-    TaintTypes:
-      - SCS0002
-    Methods:
-      - Name: ExecuteQuery
-        Arguments:
-          - query
-      - Name: ExecuteCommand
-        Arguments:
-          - command
-
-```
-
-- `Type`: The type of the sink.
-  - `System.Data.Linq.DataContext`: Represents the `DataContext` class.
-    - `TaintTypes`: Specifies applicable analyzer rule IDs.
-      - `SCS0002`: An example rule ID.
-    - `Methods`: Lists methods where tainted data is used.
-      - `Name: ExecuteQuery`: Method that executes a query.
-        - `Arguments`: Lists arguments of the method.
-          - `query`: The query argument.
-      - `Name: ExecuteCommand`: Method that executes a command.
-        - `Arguments`: Lists arguments of the method.
-          - `command`: The command argument.
+Configuration cannot express arbitrary code flow or whole-application dependency injection resolution. Review findings involving reflection, runtime registrations, and external assemblies with the appropriate deployment context.

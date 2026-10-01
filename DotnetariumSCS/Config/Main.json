@@ -1,0 +1,2183 @@
+{
+  "MaxInterproceduralMethodCallChain": 5,
+  "MaxInterproceduralLambdaOrLocalFunctionCallChain": 5,
+  "TaintFlowVisualizationEnabled": true,
+  "TaintEntryPoints": {
+    "System.Object": {
+      "Dependency": [
+        "Microsoft.AspNetCore.Mvc.ControllerBase",
+        "Microsoft.AspNetCore.Mvc.ApiControllerAttribute",
+        "Microsoft.AspNetCore.Mvc.ControllerAttribute",
+        "Microsoft.AspNetCore.Mvc.NonControllerAttribute",
+        "Microsoft.AspNetCore.Mvc.NonActionAttribute",
+        "Microsoft.AspNetCore.Mvc.FromServicesAttribute"
+      ],
+      "Class": {
+        "Accessibility": [
+          "public"
+        ],
+        "Suffix": {
+          "Text": "Controller",
+          "IncludeParent": true
+        },
+        "Attributes": {
+          "Include": [
+            {
+              "Type": "Microsoft.AspNetCore.Mvc.ControllerAttribute"
+            },
+            {
+              "Type": "Microsoft.AspNetCore.Mvc.ApiControllerAttribute"
+            }
+          ],
+          "Exclude": [
+            {
+              "Type": "Microsoft.AspNetCore.Mvc.NonControllerAttribute"
+            }
+          ]
+        }
+      },
+      "Method": {
+        "Accessibility": [
+          "public"
+        ],
+        "IncludeConstructor": false,
+        "Static": false,
+        "Attributes": {
+          "Exclude": [
+            {
+              "Type": "Microsoft.AspNetCore.Mvc.NonActionAttribute"
+            }
+          ]
+        }
+      },
+      "Parameter": {
+        "Attributes": {
+          "Exclude": [
+            {
+              "Type": "Microsoft.AspNetCore.Mvc.FromServicesAttribute"
+            }
+          ]
+        }
+      }
+    },
+    "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
+      "Class": {
+        "Accessibility": [
+          "public"
+        ],
+        "Parent": "Microsoft.AspNetCore.Mvc.RazorPages.PageModel"
+      },
+      "Method": {
+        "Name": "/^On(?:Get|Post)[^\\(]*$/",
+        "Accessibility": [
+          "public"
+        ],
+        "IncludeConstructor": false,
+        "Static": false,
+        "Attributes": {
+          "Exclude": [
+            {
+              "Type": "Microsoft.AspNetCore.Mvc.RazorPages.NonHandlerAttribute"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "TaintSources": [
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.RazorPages.PageModel",
+      "PropertyAttributes": [
+        "Microsoft.AspNetCore.Mvc.BindPropertyAttribute"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Components.ComponentBase",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "RoutedParameters": true,
+      "PropertyAttributes": [
+        "Microsoft.AspNetCore.Components.SupplyParameterFromQueryAttribute"
+      ],
+      "ServerPropertyAttributes": [
+        "Microsoft.AspNetCore.Components.SupplyParameterFromFormAttribute"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Components.MarkupString",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "PreserveTaintOnConversion": true
+    },
+    {
+      "Type": "Microsoft.EntityFrameworkCore.DbContext"
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Routing.RouteValueDictionary"
+    },
+    {
+      "Type": "System.Console",
+      "Methods": [
+        "ReadLine"
+      ]
+    },
+    {
+      "Type": "System.Net.Sockets.TcpClient",
+      "Methods": [
+        "GetStream"
+      ]
+    },
+    {
+      "Type": "System.Net.Sockets.UdpClient",
+      "Methods": [
+        "EndReceive",
+        "Receive",
+        "ReceiveAsync"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.IHeaderDictionary",
+      "IsInterface": true,
+      "Properties": [
+        "Items"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.HostString",
+      "Properties": [
+        "Host",
+        "Value"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.HttpContext",
+      "Properties": [
+        "Items",
+        "Request",
+        "Response",
+        "User"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.DefaultHttpContext",
+      "Properties": [
+        "HttpContext",
+        "Items",
+        "Request",
+        "Response",
+        "TraceIdentifier",
+        "User"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.IRequestCookieCollection",
+      "IsInterface": true,
+      "Properties": [
+        "Item"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.IFormCollection",
+      "IsInterface": true,
+      "Properties": [
+        "Files",
+        "Item"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.HttpRequest",
+      "Properties": [
+        "Body",
+        "BodyReader",
+        "ContentType",
+        "Cookies",
+        "Form",
+        "Headers",
+        "Host",
+        "HttpContext",
+        "Method",
+        "Path",
+        "PathBase",
+        "Protocol",
+        "Query",
+        "QueryString",
+        "RouteValues",
+        "Scheme"
+      ],
+      "Methods": [
+        "ReadFormAsync"
+      ]
+    },
+    {
+      "Type": "System.IO.Compression.ZipArchiveEntry",
+      "Properties": [
+        "FullName",
+        "Name"
+      ]
+    },
+    {
+      "Type": "System.Net.DownloadDataCompletedEventArgs",
+      "Properties": [
+        "Result"
+      ]
+    },
+    {
+      "Type": "System.Net.OpenReadCompletedEventArgs",
+      "Properties": [
+        "Result"
+      ]
+    }
+  ],
+  "Sanitizers": [
+    {
+      "Type": "Microsoft.Security.Application.Encoder",
+      "TaintTypes": [
+        "LdapDnInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "LdapDistinguishedNameEncode"
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.Security.Application.Encoder",
+      "TaintTypes": [
+        "LdapFilterInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "LdapEncode"
+        },
+        {
+          "Name": "LdapFilterEncode"
+        }
+      ]
+    },
+    {
+      "Type": "System.Uri",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "TryCreate",
+          "Condition": [
+            {
+              "1": 2
+            }
+          ],
+          "InOut": [
+            {
+              "uriString": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.IUrlHelper",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "RouteUrl"
+        },
+        {
+          "Name": "IsLocalUrl",
+          "InOut": [
+            {
+              "url": "url"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.UrlHelperExtensions",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "RouteUrl"
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.Security.Application.Encoder",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "Methods": [
+        {
+          "Name": "HtmlAttributeEncode"
+        },
+        {
+          "Name": "HtmlEncode"
+        },
+        {
+          "Name": "HtmlFormUrlEncode"
+        },
+        {
+          "Name": "UrlEncode"
+        },
+        {
+          "Name": "UrlPathEncode"
+        },
+        {
+          "Name": "XmlAttributeEncode"
+        },
+        {
+          "Name": "XmlEncode"
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.Security.Application.AntiXss",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "Methods": [
+        {
+          "Name": "HtmlAttributeEncode"
+        },
+        {
+          "Name": "HtmlEncode"
+        },
+        {
+          "Name": "HtmlFormUrlEncode"
+        },
+        {
+          "Name": "UrlEncode"
+        },
+        {
+          "Name": "UrlPathEncode"
+        },
+        {
+          "Name": "XmlAttributeEncode"
+        },
+        {
+          "Name": "XmlEncode"
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.Security.Application.AntiXssEncoder",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "Methods": [
+        {
+          "Name": "HtmlAttributeEncode"
+        },
+        {
+          "Name": "HtmlEncode"
+        }
+      ]
+    },
+    {
+      "Type": "System.Text.Encodings.Web.TextEncoder",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "Methods": [
+        {
+          "Name": "Encode",
+          "ArgumentCount": 1,
+          "InOut": [
+            {
+              "value": ".Return"
+            }
+          ]
+        },
+        {
+          "Name": "Encode",
+          "ArgumentCount": 2,
+          "InOut": [
+            {
+              "value": "output"
+            }
+          ]
+        },
+        {
+          "Name": "Encode",
+          "ArgumentCount": 4,
+          "InOut": [
+            {
+              "value": "output"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.Extensions.FileProviders.PhysicalFileProvider",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "GetFileInfo"
+        }
+      ]
+    },
+    {
+      "Type": "System.Text.StringBuilder",
+      "Methods": [
+        {
+          "Name": "Clear",
+          "CleansInstance": true
+        }
+      ]
+    },
+    {
+      "Type": "System.Convert",
+      "Methods": [
+        {
+          "Name": "ToString",
+          "SignatureNot": [
+            "System.String"
+          ]
+        },
+        {
+          "Name": "ToByte"
+        },
+        {
+          "Name": "ToSByte"
+        },
+        {
+          "Name": "ToChar"
+        },
+        {
+          "Name": "ToBoolean"
+        },
+        {
+          "Name": "ToInt16"
+        },
+        {
+          "Name": "ToInt32"
+        },
+        {
+          "Name": "ToInt64"
+        },
+        {
+          "Name": "ToUInt16"
+        },
+        {
+          "Name": "ToUInt32"
+        },
+        {
+          "Name": "ToUInt64"
+        },
+        {
+          "Name": "ToSingle"
+        },
+        {
+          "Name": "ToDouble"
+        },
+        {
+          "Name": "ToDecimal"
+        },
+        {
+          "Name": "ToDateTime"
+        }
+      ]
+    },
+    {
+      "Type": "System.Byte",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.SByte",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Char",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Boolean",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "value": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Int16",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Int32",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Int64",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.UInt16",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.UInt32",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.UInt64",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IntPtr",
+      "Methods": [
+        {
+          "Name": "ToString"
+        }
+      ]
+    },
+    {
+      "Type": "System.UIntPtr",
+      "Methods": [
+        {
+          "Name": "ToString"
+        }
+      ]
+    },
+    {
+      "Type": "System.Single",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Double",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Decimal",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Guid",
+      "Methods": [
+        {
+          "Name": ".ctor"
+        },
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "ParseExact"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "input": "result"
+            }
+          ]
+        },
+        {
+          "Name": "TryParseExact",
+          "InOut": [
+            {
+              "input": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.DateTime",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "ParseExact"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        },
+        {
+          "Name": "TryParseExact",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.TimeSpan",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "ParseExact"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        },
+        {
+          "Name": "TryParseExact",
+          "InOut": [
+            {
+              "s": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.DateTimeOffset",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "ParseExact"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "input": "result"
+            }
+          ]
+        },
+        {
+          "Name": "TryParseExact",
+          "InOut": [
+            {
+              "input": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Enum",
+      "Methods": [
+        {
+          "Name": "ToString"
+        },
+        {
+          "Name": "Parse"
+        },
+        {
+          "Name": "TryParse",
+          "InOut": [
+            {
+              "value": "result"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "Transfers": [
+    {
+      "Type": "System.Uri",
+      "Methods": [
+        {
+          "Name": "TryCreate",
+          "InOut": [
+            {
+              "uriString": "result"
+            },
+            {
+              "baseUri": "result"
+            },
+            {
+              "relativeUri": "result"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Text.StringBuilder",
+      "Methods": [
+        {
+          "Name": "Append",
+          "InOut": [
+            {
+              "value": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "AppendFormat",
+          "InOut": [
+            {
+              "format": ".This"
+            },
+            {
+              "arg0": ".This"
+            },
+            {
+              "arg1": ".This"
+            },
+            {
+              "arg2": ".This"
+            },
+            {
+              "args": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "AppendJoin",
+          "InOut": [
+            {
+              "separator": ".This"
+            },
+            {
+              "values": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "AppendLine",
+          "InOut": [
+            {
+              "value": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "CopyTo",
+          "InOut": [
+            {
+              ".This": "destination"
+            }
+          ]
+        },
+        {
+          "Name": "Insert",
+          "InOut": [
+            {
+              "value": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "Replace",
+          "InOut": [
+            {
+              "newValue": ".This"
+            },
+            {
+              "newChar": ".This"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.Stream",
+      "Methods": [
+        {
+          "Name": "BeginWrite",
+          "InOut": [
+            {
+              "buffer": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "CopyTo",
+          "InOut": [
+            {
+              ".This": "destination"
+            }
+          ]
+        },
+        {
+          "Name": "CopyToAsync",
+          "InOut": [
+            {
+              ".This": "destination"
+            }
+          ]
+        },
+        {
+          "Name": "Read",
+          "InOut": [
+            {
+              ".This": "buffer"
+            }
+          ]
+        },
+        {
+          "Name": "ReadAsync",
+          "InOut": [
+            {
+              ".This": "buffer"
+            }
+          ]
+        },
+        {
+          "Name": "Write",
+          "InOut": [
+            {
+              "buffer": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "WriteAsync",
+          "InOut": [
+            {
+              "buffer": ".This"
+            }
+          ]
+        },
+        {
+          "Name": "WriteByte",
+          "InOut": [
+            {
+              "value": ".This"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "Sinks": [
+    {
+      "Type": "System.Net.NetworkCredential",
+      "TaintTypes": [
+        "HardcodedSecret"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "password"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.UriBuilder",
+      "TaintTypes": [
+        "HardcodedSecret"
+      ],
+      "Properties": [
+        "Password"
+      ]
+    },
+    {
+      "Type": "System.Security.Cryptography.SymmetricAlgorithm",
+      "TaintTypes": [
+        "HardcodedSecret"
+      ],
+      "Properties": [
+        "IV",
+        "Key"
+      ]
+    },
+    {
+      "Type": "System.Diagnostics.Process",
+      "TaintTypes": [
+        "CommandInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "Start",
+          "Arguments": [
+            "fileName",
+            "arguments"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Diagnostics.ProcessStartInfo",
+      "TaintTypes": [
+        "CommandInjection"
+      ],
+      "IsAnyStringParameterInConstructorASink": true,
+      "Properties": [
+        "ArgumentList",
+        "Arguments",
+        "FileName"
+      ]
+    },
+    {
+      "Type": "System.Runtime.Serialization.NetDataContractSerializer",
+      "TaintTypes": [
+        "UnsafeDeserialization"
+      ],
+      "Methods": [
+        {
+          "Name": "Deserialize",
+          "Arguments": [
+            "stream"
+          ]
+        },
+        {
+          "Name": "ReadObject",
+          "Arguments": [
+            "reader"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Newtonsoft.Json.JsonSerializerSettings",
+      "TaintTypes": [
+        "UnsafeDeserialization"
+      ],
+      "Properties": [
+        "TypeNameHandling"
+      ]
+    },
+    {
+      "Type": "System.DirectoryServices.DirectorySearcher",
+      "TaintTypes": [
+        "LdapFilterInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "filter"
+          ]
+        }
+      ],
+      "Properties": [
+        "Filter"
+      ]
+    },
+    {
+      "Type": "System.DirectoryServices.DirectoryEntry",
+      "TaintTypes": [
+        "LdapDnInjection"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "path"
+          ]
+        }
+      ],
+      "Properties": [
+        "Path"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.HttpResponse",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "Redirect",
+          "Arguments": [
+            "location"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.ControllerBase",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "Redirect",
+          "Arguments": [
+            "url"
+          ]
+        },
+        {
+          "Name": "RedirectPermanent",
+          "Arguments": [
+            "url"
+          ]
+        },
+        {
+          "Name": "RedirectPreserveMethod",
+          "Arguments": [
+            "url"
+          ]
+        },
+        {
+          "Name": "RedirectPermanentPreserveMethod",
+          "Arguments": [
+            "url"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.RazorPages.PageModel",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": "Redirect",
+          "Arguments": [
+            "url"
+          ]
+        },
+        {
+          "Name": "RedirectPermanent",
+          "Arguments": [
+            "url"
+          ]
+        },
+        {
+          "Name": "RedirectPreserveMethod",
+          "Arguments": [
+            "url"
+          ]
+        },
+        {
+          "Name": "RedirectPermanentPreserveMethod",
+          "Arguments": [
+            "url"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.RedirectResult",
+      "TaintTypes": [
+        "OpenRedirect"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "url"
+          ]
+        }
+      ],
+      "Properties": [
+        "Url"
+      ]
+    },
+    {
+      "Type": "System.IO.Directory",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "CreateDirectory",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "CreateSymbolicLink",
+          "Arguments": [
+            "path",
+            "pathToTarget"
+          ]
+        },
+        {
+          "Name": "Delete",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "EnumerateDirectories",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "EnumerateFiles",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "EnumerateFileSystemEntries",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "GetDirectories",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "GetFiles",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "GetFileSystemEntries",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "Move",
+          "Arguments": [
+            "sourceDirName",
+            "destDirName"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.File",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "AppendAllLines",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "AppendAllLinesAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "AppendAllText",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "AppendAllTextAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "AppendText",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "Copy",
+          "Arguments": [
+            "sourceFileName",
+            "destFileName"
+          ]
+        },
+        {
+          "Name": "Create",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "CreateSymbolicLink",
+          "Arguments": [
+            "path",
+            "pathToTarget"
+          ]
+        },
+        {
+          "Name": "CreateText",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "Delete",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "Move",
+          "Arguments": [
+            "sourceFileName",
+            "destFileName"
+          ]
+        },
+        {
+          "Name": "Open",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "OpenHandle",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "OpenRead",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "OpenText",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "OpenWrite",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadAllBytes",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadAllBytesAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadAllLines",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadAllLinesAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadAllText",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadAllTextAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "ReadLines",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "Replace",
+          "Arguments": [
+            "sourceFileName",
+            "destinationFileName",
+            "destinationBackupFileName"
+          ]
+        },
+        {
+          "Name": "SetAccessControl",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "WriteAllBytes",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "WriteAllBytesAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "WriteAllLines",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "WriteAllLinesAsync",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "WriteAllText",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "WriteAllTextAsync",
+          "Arguments": [
+            "path"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.FileInfo",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "fileName"
+          ]
+        },
+        {
+          "Name": "CopyTo",
+          "Arguments": [
+            "destFileName"
+          ]
+        },
+        {
+          "Name": "MoveTo",
+          "Arguments": [
+            "destFileName"
+          ]
+        },
+        {
+          "Name": "Replace",
+          "Arguments": [
+            "destinationFileName",
+            "destinationBackupFileName"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Reflection.Assembly",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "LoadFile",
+          "Arguments": [
+            "path"
+          ]
+        },
+        {
+          "Name": "LoadFrom",
+          "Arguments": [
+            "assemblyFile"
+          ]
+        },
+        {
+          "Name": "ReflectionOnlyLoadFrom",
+          "Arguments": [
+            "assemblyFile"
+          ]
+        },
+        {
+          "Name": "UnsafeLoadFrom",
+          "Arguments": [
+            "assemblyFile"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Xml.XmlReader",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "Create",
+          "Arguments": [
+            "inputUri"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.StreamReader",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "path"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.StreamWriter",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "path"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.FileStream",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "handle",
+            "path"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.PhysicalFileResult",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "fileName"
+          ]
+        }
+      ],
+      "Properties": [
+        "FileName"
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.RazorPages.PageModel",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "PhysicalFile",
+          "Arguments": [
+            "physicalPath"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.IO.Compression.ZipFileExtensions",
+      "TaintTypes": [
+        "PathEscape"
+      ],
+      "Methods": [
+        {
+          "Name": "CreateEntryFromFile",
+          "Arguments": [
+            "sourceFileName"
+          ]
+        },
+        {
+          "Name": "ExtractToFile",
+          "Arguments": [
+            "destinationFileName"
+          ]
+        },
+        {
+          "Name": "ExtractToDirectory",
+          "Arguments": [
+            "destinationDirectoryName"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Html.HtmlString",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "value"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Html.IHtmlContentBuilder",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "IsInterface": true,
+      "Methods": [
+        {
+          "Name": "AppendHtml",
+          "Arguments": [
+            "encoded"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "Methods": [
+        {
+          "Name": "AddContent",
+          "Arguments": [
+            "markupContent"
+          ]
+        },
+        {
+          "Name": "AddMarkupContent",
+          "Arguments": [
+            "markupContent"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Mvc.Rendering.IHtmlHelper",
+      "TaintTypes": [
+        "CrossSiteScripting"
+      ],
+      "IsInterface": true,
+      "Methods": [
+        {
+          "Name": "Raw",
+          "Arguments": [
+            "value"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Xml.XmlNode",
+      "TaintTypes": [
+        "XPathInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "SelectNodes",
+          "Arguments": [
+            "xpath"
+          ]
+        },
+        {
+          "Name": "SelectSingleNode",
+          "Arguments": [
+            "xpath"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Xml.XPath.XPathNavigator",
+      "TaintTypes": [
+        "XPathInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "Compile",
+          "Arguments": [
+            "xpath"
+          ]
+        },
+        {
+          "Name": "Evaluate",
+          "Arguments": [
+            "xpath"
+          ]
+        },
+        {
+          "Name": "Matches",
+          "Arguments": [
+            "xpath"
+          ]
+        },
+        {
+          "Name": "Select",
+          "Arguments": [
+            "xpath"
+          ]
+        },
+        {
+          "Name": "SelectAncestors",
+          "Arguments": [
+            "name"
+          ]
+        },
+        {
+          "Name": "SelectChildren",
+          "Arguments": [
+            "name"
+          ]
+        },
+        {
+          "Name": "SelectDescendants",
+          "Arguments": [
+            "name"
+          ]
+        },
+        {
+          "Name": "SelectSingleNode",
+          "Arguments": [
+            "xpath"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Xml.XPath.XPathExpression",
+      "TaintTypes": [
+        "XPathInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "Compile",
+          "Arguments": [
+            "xpath"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Xml.XPath.Extensions",
+      "TaintTypes": [
+        "XPathInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "XPathSelectElement",
+          "Arguments": [
+            "expression"
+          ]
+        },
+        {
+          "Name": "XPathSelectElements",
+          "Arguments": [
+            "expression"
+          ]
+        },
+        {
+          "Name": "XPathEvaluate",
+          "Arguments": [
+            "expression"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Xml.Schema.XmlSchemaXPath",
+      "TaintTypes": [
+        "XPathInjection"
+      ],
+      "Properties": [
+        "XPath"
+      ]
+    },
+    {
+      "Type": "System.Data.IDbCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "IsAnyStringParameterInConstructorASink": true,
+      "IsInterface": true,
+      "Properties": [
+        "CommandText"
+      ]
+    },
+    {
+      "Type": "System.Data.IDataAdapter",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "IsAnyStringParameterInConstructorASink": true,
+      "IsInterface": true
+    },
+    {
+      "Type": "MySql.Data.MySqlClient.MySqlHelper",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "ExecuteDataRow",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteDataRowAsync",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteDataset",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteDatasetAsync",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteNonQuery",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteNonQueryAsync",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteReader",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteReaderAsync",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteScalar",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "ExecuteScalarAsync",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "UpdateDataSet",
+          "Arguments": [
+            "commandText"
+          ]
+        },
+        {
+          "Name": "UpdateDataSetAsync",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Data.SQLite.SQLiteCommand",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "Execute",
+          "Arguments": [
+            "commandText"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "SqlQueryRaw",
+          "Arguments": [
+            "sql"
+          ]
+        },
+        {
+          "Name": "ExecuteSqlCommand",
+          "Arguments": [
+            "sql"
+          ]
+        },
+        {
+          "Name": "ExecuteSqlCommandAsync",
+          "Arguments": [
+            "sql"
+          ]
+        },
+        {
+          "Name": "ExecuteSqlRaw",
+          "Arguments": [
+            "sql"
+          ]
+        },
+        {
+          "Name": "ExecuteSqlRawAsync",
+          "Arguments": [
+            "sql"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.EntityFrameworkCore.RelationalQueryableExtensions",
+      "TaintTypes": [
+        "SqlInjection"
+      ],
+      "Methods": [
+        {
+          "Name": "FromSqlRaw",
+          "Arguments": [
+            "sql"
+          ]
+        },
+        {
+          "Name": "FromSql",
+          "Arguments": [
+            "sql"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Net.Http.HttpClient",
+      "TaintTypes": [
+        "ServerSideRequestForgery"
+      ],
+      "Methods": [
+        {
+          "Name": "GetAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "GetStringAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "GetStreamAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "GetByteArrayAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "PostAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "PutAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "PatchAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        },
+        {
+          "Name": "DeleteAsync",
+          "Arguments": [
+            "requestUri"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "System.Net.Http.HttpRequestMessage",
+      "TaintTypes": [
+        "ServerSideRequestForgery"
+      ],
+      "Methods": [
+        {
+          "Name": ".ctor",
+          "Arguments": [
+            "requestUri"
+          ]
+        }
+      ]
+    },
+    {
+      "Type": "Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript",
+      "TaintTypes": [
+        "DynamicCodeExecution"
+      ],
+      "Methods": [
+        {
+          "Name": "EvaluateAsync",
+          "Arguments": [
+            "code"
+          ]
+        },
+        {
+          "Name": "RunAsync",
+          "Arguments": [
+            "code"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -12,22 +12,22 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 var cases = new (string Name, string Statement, string Rule, bool ShouldWarn)[]
 {
-    ("directory enumeration", "System.IO.Directory.EnumerateFiles(path);", "SCS0018", true),
-    ("directory enumeration of directories", "System.IO.Directory.EnumerateDirectories(path);", "SCS0018", true),
-    ("directory enumeration of entries", "System.IO.Directory.EnumerateFileSystemEntries(path);", "SCS0018", true),
-    ("directory listing of directories", "System.IO.Directory.GetDirectories(path);", "SCS0018", true),
-    ("directory listing of entries", "System.IO.Directory.GetFileSystemEntries(path);", "SCS0018", true),
-    ("directory creation", "System.IO.Directory.CreateDirectory(path);", "SCS0018", true),
-    ("directory symlink target", "System.IO.Directory.CreateSymbolicLink(\"link\", path);", "SCS0018", true),
-    ("file handle", "System.IO.File.OpenHandle(path);", "SCS0018", true),
-    ("file symlink target", "System.IO.File.CreateSymbolicLink(\"link\", path);", "SCS0018", true),
-    ("file symlink path", "System.IO.File.CreateSymbolicLink(path, \"target\");", "SCS0018", true),
-    ("constant directory", "System.IO.Directory.EnumerateFiles(\"fixed\");", "SCS0018", false),
-    ("constant file handle", "System.IO.File.OpenHandle(\"fixed\");", "SCS0018", false),
-    ("lookalike method", "FakeFile.OpenHandle(path);", "SCS0018", false),
-    ("EF Core scalar raw SQL", "context.Database.SqlQueryRaw<int>(path);", "SCS0002", true),
-    ("EF Core constant raw SQL", "context.Database.SqlQueryRaw<int>(\"SELECT 1\");", "SCS0002", false),
-    ("EF Core parameterized SQL", "context.Database.SqlQuery<int>($\"SELECT {path}\");", "SCS0002", false),
+    ("directory enumeration", "System.IO.Directory.EnumerateFiles(path);", "DNA0004", true),
+    ("directory enumeration of directories", "System.IO.Directory.EnumerateDirectories(path);", "DNA0004", true),
+    ("directory enumeration of entries", "System.IO.Directory.EnumerateFileSystemEntries(path);", "DNA0004", true),
+    ("directory listing of directories", "System.IO.Directory.GetDirectories(path);", "DNA0004", true),
+    ("directory listing of entries", "System.IO.Directory.GetFileSystemEntries(path);", "DNA0004", true),
+    ("directory creation", "System.IO.Directory.CreateDirectory(path);", "DNA0004", true),
+    ("directory symlink target", "System.IO.Directory.CreateSymbolicLink(\"link\", path);", "DNA0004", true),
+    ("file handle", "System.IO.File.OpenHandle(path);", "DNA0004", true),
+    ("file symlink target", "System.IO.File.CreateSymbolicLink(\"link\", path);", "DNA0004", true),
+    ("file symlink path", "System.IO.File.CreateSymbolicLink(path, \"target\");", "DNA0004", true),
+    ("constant directory", "System.IO.Directory.EnumerateFiles(\"fixed\");", "DNA0004", false),
+    ("constant file handle", "System.IO.File.OpenHandle(\"fixed\");", "DNA0004", false),
+    ("lookalike method", "FakeFile.OpenHandle(path);", "DNA0004", false),
+    ("EF Core scalar raw SQL", "context.Database.SqlQueryRaw<int>(path);", "DNA0001", true),
+    ("EF Core constant raw SQL", "context.Database.SqlQueryRaw<int>(\"SELECT 1\");", "DNA0001", false),
+    ("EF Core parameterized SQL", "context.Database.SqlQuery<int>($\"SELECT {path}\");", "DNA0001", false),
 };
 
 var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
@@ -66,7 +66,7 @@ public static class FakeFile
     if (errors.Length != 0)
         throw new Exception($"{test.Name}: source did not compile: {string.Join("; ", errors.Select(d => d.ToString()))}");
 
-    DiagnosticAnalyzer analyzer = test.Rule == "SCS0002" ? new SqlInjectionTaintAnalyzer() : new PathTraversalTaintAnalyzer();
+    DiagnosticAnalyzer analyzer = test.Rule == "DNA0001" ? new SqlInjectionTaintAnalyzer() : new PathTraversalTaintAnalyzer();
     var diagnostics = await compilation.WithAnalyzers(
         ImmutableArray.Create(analyzer)).GetAnalyzerDiagnosticsAsync();
     var warned = diagnostics.Any(d => d.Id == test.Rule);
