@@ -19,12 +19,19 @@ namespace Dotnetarium.Analyzers
         public static readonly DiagnosticDescriptor CookieConfiguration = Create("DNA0010", "Insecure cookie configuration", "Cookie '{0}' has unsafe settings: {1}.", 614);
         public static readonly DiagnosticDescriptor ServerSideRequestForgery = Taint("DNA0011", "Server-side request forgery", 918);
         public static readonly DiagnosticDescriptor DynamicCodeExecution = Taint("DNA0012", "Dynamic code execution", 94);
+        public static readonly DiagnosticDescriptor WeakCipher = Create("DNA0013", "Weak encryption algorithm", "'{0}' is a legacy cipher; use AES or a supported authenticated cipher.", 327);
+        public static readonly DiagnosticDescriptor EcbMode = Create("DNA0014", "ECB encryption mode", "'{0}' uses ECB, which reveals repeated plaintext blocks.", 327);
+        public static readonly DiagnosticDescriptor FixedNonce = Create("DNA0015", "Fixed encryption IV or nonce", "'{0}' encrypts with a fixed IV or nonce; generate a fresh value for each encryption.", 329);
+        public static readonly DiagnosticDescriptor WeakPbkdf2 = Create("DNA0016", "Low PBKDF2 work factor", "PBKDF2 iteration count {0} is too low for password-derived keys.", 916);
+        public static readonly DiagnosticDescriptor HardcodedPqcPrivateKey = Create("DNA0017", "Hardcoded post-quantum private key", "'{0}' imports literal post-quantum private key material.", 321);
 
         private static readonly IReadOnlyDictionary<string, int> CweById = new Dictionary<string, int>
         {
             ["DNA0001"] = 89, ["DNA0002"] = 78, ["DNA0003"] = 79, ["DNA0004"] = 22,
             ["DNA0005"] = 601, ["DNA0006"] = 90, ["DNA0007"] = 643, ["DNA0008"] = 502,
-            ["DNA0009"] = 798, ["DNA0010"] = 614, ["DNA0011"] = 918, ["DNA0012"] = 94
+            ["DNA0009"] = 798, ["DNA0010"] = 614, ["DNA0011"] = 918, ["DNA0012"] = 94,
+            ["DNA0013"] = 327, ["DNA0014"] = 327, ["DNA0015"] = 329, ["DNA0016"] = 916,
+            ["DNA0017"] = 321
         };
 
         public static bool TryGetCwe(string id, out int cwe) => CweById.TryGetValue(id, out cwe);

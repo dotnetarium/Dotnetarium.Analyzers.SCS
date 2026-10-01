@@ -1092,9 +1092,23 @@
         "HardcodedSecret"
       ],
       "Properties": [
-        "IV",
         "Key"
       ]
+    },
+    {
+      "Type": "System.Security.Cryptography.AesGcm",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [{ "Name": ".ctor", "Arguments": ["key"] }]
+    },
+    {
+      "Type": "System.Security.Cryptography.AesCcm",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [{ "Name": ".ctor", "Arguments": ["key"] }]
+    },
+    {
+      "Type": "System.Security.Cryptography.ChaCha20Poly1305",
+      "TaintTypes": ["HardcodedSecret"],
+      "Methods": [{ "Name": ".ctor", "Arguments": ["key"] }]
     },
     {
       "Type": "System.Diagnostics.Process",

@@ -4,7 +4,7 @@ Dotnetarium checks modern C# projects for security problems. It follows untruste
 
 Use the **NuGet analyzer** to see findings during a build, or the **global tool** to scan a project or solution and produce SARIF for CI. Both use the same rules.
 
-It checks injection paths through SQL, commands, HTML, file paths, redirects, LDAP, XPath, outbound requests, and dynamic code. It also checks unsafe deserialization, hardcoded secrets, and cookie settings. See the [rule notes](docs/rules) for coverage and limitations, including [Razor and Blazor](docs/razor-blazor-taint.md).
+It checks injection paths through SQL, commands, HTML, file paths, redirects, LDAP, XPath, outbound requests, and dynamic code. It also checks unsafe deserialization, hardcoded secrets, cookie settings, and modern .NET cryptography usage, including a separate post-quantum private-key rule. See the [rule notes](docs/rules) for coverage and limitations, including [Razor and Blazor](docs/razor-blazor-taint.md).
 
 ## Install
 

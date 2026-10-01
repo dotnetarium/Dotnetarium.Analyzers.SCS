@@ -97,9 +97,12 @@ public sealed partial class SinkCoverageTests
 
         yield return M("System.Net.NetworkCredential", "DNA0009", ".ctor", "_ = new System.Net.NetworkCredential(\"user\", \"secret\");");
         yield return P("System.UriBuilder", "DNA0009", "Password", "new System.UriBuilder().Password = \"secret\";");
-        foreach (var member in new[] { "IV", "Key" })
+        foreach (var member in new[] { "Key" })
             yield return P("System.Security.Cryptography.SymmetricAlgorithm", "DNA0009", member,
                 $"System.Security.Cryptography.Aes.Create().{member} = new byte[] {{ 1, 2, 3 }};");
+        yield return M("System.Security.Cryptography.AesGcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesGcm(new byte[] { 1, 2, 3 }, 16);");
+        yield return M("System.Security.Cryptography.AesCcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesCcm(new byte[] { 1, 2, 3 });");
+        yield return M("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[] { 1, 2, 3 });");
 
         yield return M("System.Diagnostics.Process", "DNA0002", "Start", "_ = System.Diagnostics.Process.Start(input);");
         yield return new MemberProbe("System.Diagnostics.ProcessStartInfo", "DNA0002", "C", ".ctor", "_ = new System.Diagnostics.ProcessStartInfo(input);");
