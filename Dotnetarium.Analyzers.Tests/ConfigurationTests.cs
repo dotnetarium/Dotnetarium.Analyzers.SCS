@@ -19,6 +19,17 @@ public sealed class ConfigurationTests
     }
 
     [Fact]
+    public void Crypto_key_sinks_do_not_treat_an_iv_as_a_secret()
+    {
+        var sinks = new ConfigurationReader().GetBuiltinConfiguration().Sinks;
+        var symmetric = Assert.Single(sinks, sink => sink.Type == "System.Security.Cryptography.SymmetricAlgorithm");
+        Assert.Contains("Key", symmetric.Properties);
+        Assert.DoesNotContain("IV", symmetric.Properties);
+        foreach (var type in new[] { "AesGcm", "AesCcm", "ChaCha20Poly1305" })
+            Assert.Contains(sinks, sink => sink.Type == "System.Security.Cryptography." + type);
+    }
+
+    [Fact]
     public void Rejects_duplicate_JSON_properties()
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes("{\"Version\":\"2.0\",\"Version\":\"2.0\"}"));

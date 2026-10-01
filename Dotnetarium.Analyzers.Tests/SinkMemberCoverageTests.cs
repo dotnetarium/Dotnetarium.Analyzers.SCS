@@ -97,9 +97,33 @@ public sealed partial class SinkCoverageTests
 
         yield return M("System.Net.NetworkCredential", "DNA0009", ".ctor", "_ = new System.Net.NetworkCredential(\"user\", \"secret\");");
         yield return P("System.UriBuilder", "DNA0009", "Password", "new System.UriBuilder().Password = \"secret\";");
-        foreach (var member in new[] { "IV", "Key" })
+        foreach (var member in new[] { "Key" })
             yield return P("System.Security.Cryptography.SymmetricAlgorithm", "DNA0009", member,
                 $"System.Security.Cryptography.Aes.Create().{member} = new byte[] {{ 1, 2, 3 }};");
+        yield return M("System.Security.Cryptography.AesGcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesGcm(new byte[] { 1, 2, 3 }, 16);");
+        yield return M("System.Security.Cryptography.AesCcm", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.AesCcm(new byte[] { 1, 2, 3 });");
+        yield return M("System.Security.Cryptography.ChaCha20Poly1305", "DNA0009", ".ctor", "_ = new System.Security.Cryptography.ChaCha20Poly1305(new byte[] { 1, 2, 3 });");
+        yield return M("Org.BouncyCastle.Crypto.Parameters.KeyParameter", "DNA0009", ".ctor", "_ = new Org.BouncyCastle.Crypto.Parameters.KeyParameter(new byte[] { 1, 2, 3 });");
+        yield return M("NSec.Cryptography.Key", "DNA0009", "Import", "_ = NSec.Cryptography.Key.Import(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[] { 1, 2, 3 }, NSec.Cryptography.KeyBlobFormat.RawSymmetricKey);");
+        yield return M("NSec.Cryptography.Key", "DNA0009", "TryImport", "_ = NSec.Cryptography.Key.TryImport(NSec.Cryptography.AeadAlgorithm.Aes256Gcm, new byte[] { 1, 2, 3 }, NSec.Cryptography.KeyBlobFormat.RawSymmetricKey, out var importedKey);");
+        yield return M("Sodium.SecretBox", "DNA0009", "Create", "_ = Sodium.SecretBox.Create(new byte[1], new byte[24], new byte[] { 1, 2, 3 });");
+        yield return M("Sodium.SecretBox", "DNA0009", "CreateDetached", "_ = Sodium.SecretBox.CreateDetached(new byte[1], new byte[24], new byte[] { 1, 2, 3 });");
+        yield return M("Sodium.SecretBox", "DNA0009", "Open", "_ = Sodium.SecretBox.Open(new byte[1], new byte[24], new byte[] { 1, 2, 3 });");
+        yield return M("Sodium.SecretBox", "DNA0009", "OpenDetached", "_ = Sodium.SecretBox.OpenDetached(new byte[1], new byte[16], new byte[24], new byte[] { 1, 2, 3 });");
+        foreach (var (type, size) in new[]
+        {
+            ("SecretAeadAes", 12), ("SecretAeadChaCha20Poly1305", 8),
+            ("SecretAeadChaCha20Poly1305IETF", 12), ("SecretAeadXChaCha20Poly1305", 24)
+        })
+            yield return M("Sodium." + type, "DNA0009", "Encrypt",
+                $"_ = Sodium.{type}.Encrypt(new byte[1], new byte[{size}], new byte[] {{ 1, 2, 3 }}, null);");
+        foreach (var (type, size) in new[]
+        {
+            ("SecretAeadAes", 12), ("SecretAeadChaCha20Poly1305", 8),
+            ("SecretAeadChaCha20Poly1305IETF", 12), ("SecretAeadXChaCha20Poly1305", 24)
+        })
+            yield return M("Sodium." + type, "DNA0009", "Decrypt",
+                $"_ = Sodium.{type}.Decrypt(new byte[1], new byte[{size}], new byte[] {{ 1, 2, 3 }}, null);");
 
         yield return M("System.Diagnostics.Process", "DNA0002", "Start", "_ = System.Diagnostics.Process.Start(input);");
         yield return new MemberProbe("System.Diagnostics.ProcessStartInfo", "DNA0002", "C", ".ctor", "_ = new System.Diagnostics.ProcessStartInfo(input);");
