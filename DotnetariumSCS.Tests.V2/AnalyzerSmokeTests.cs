@@ -210,27 +210,51 @@ public sealed class AnalyzerSmokeTests
     }
 
     [Fact]
-    public async Task Reports_untrusted_stream_in_unsafe_deserializer()
+    public async Task Reports_unsafe_JsonNet_type_name_handling_but_not_None()
     {
         var diagnostics = await AnalyzeAsync("""
-            using System.IO;
-            using System.Net.Sockets;
-            namespace System.Runtime.Serialization
+            namespace Newtonsoft.Json
             {
-                public class NetDataContractSerializer
+                public enum TypeNameHandling { None, Objects, Arrays, All, Auto }
+                public sealed class JsonSerializerSettings
                 {
-                    public object Deserialize(Stream stream) => new object();
+                    public TypeNameHandling TypeNameHandling { get; set; }
                 }
             }
             public class Demo
             {
-                public object Run(TcpClient client) =>
-                    new System.Runtime.Serialization.NetDataContractSerializer()
-                        .Deserialize(client.GetStream());
+                public void Run()
+                {
+                    var settings = new Newtonsoft.Json.JsonSerializerSettings();
+                    settings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All;
+                    settings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.Auto;
+                    settings.TypeNameHandling = Newtonsoft.Json.TypeNameHandling.None;
+                }
             }
-            """, new DeserializationTaintAnalyzer());
+            """, new UnsafeDeserializationSettingAnalyzer());
 
-        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0008"));
+        Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0008"));
+    }
+
+    [Fact]
+    public async Task Escaped_argument_list_and_xpath_node_name_are_not_injection_sinks()
+    {
+        var source = """
+            using System.Diagnostics;
+            using System.Xml;
+            class DemoController
+            {
+                public void Run(string input)
+                {
+                    new ProcessStartInfo("fixed") .ArgumentList.Add(input);
+                    new XmlDocument().CreateNavigator()!.SelectAncestors(input, "", false);
+                }
+            }
+            """;
+        var command = await AnalyzeAsync(source, new CommandInjectionTaintAnalyzer());
+        var xpath = await AnalyzeAsync(source, new XPathTaintAnalyzer());
+        Assert.DoesNotContain(command, diagnostic => diagnostic.Id == "DNA0002");
+        Assert.DoesNotContain(xpath, diagnostic => diagnostic.Id == "DNA0007");
     }
 
     [Fact]

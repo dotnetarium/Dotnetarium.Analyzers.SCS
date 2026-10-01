@@ -1118,38 +1118,8 @@
       ],
       "IsAnyStringParameterInConstructorASink": true,
       "Properties": [
-        "ArgumentList",
         "Arguments",
         "FileName"
-      ]
-    },
-    {
-      "Type": "System.Runtime.Serialization.NetDataContractSerializer",
-      "TaintTypes": [
-        "UnsafeDeserialization"
-      ],
-      "Methods": [
-        {
-          "Name": "Deserialize",
-          "Arguments": [
-            "stream"
-          ]
-        },
-        {
-          "Name": "ReadObject",
-          "Arguments": [
-            "reader"
-          ]
-        }
-      ]
-    },
-    {
-      "Type": "Newtonsoft.Json.JsonSerializerSettings",
-      "TaintTypes": [
-        "UnsafeDeserialization"
-      ],
-      "Properties": [
-        "TypeNameHandling"
       ]
     },
     {
@@ -1507,12 +1477,6 @@
           ]
         },
         {
-          "Name": "SetAccessControl",
-          "Arguments": [
-            "path"
-          ]
-        },
-        {
           "Name": "WriteAllBytes",
           "Arguments": [
             "path"
@@ -1597,12 +1561,6 @@
         },
         {
           "Name": "LoadFrom",
-          "Arguments": [
-            "assemblyFile"
-          ]
-        },
-        {
-          "Name": "ReflectionOnlyLoadFrom",
           "Arguments": [
             "assemblyFile"
           ]
@@ -1844,24 +1802,6 @@
           ]
         },
         {
-          "Name": "SelectAncestors",
-          "Arguments": [
-            "name"
-          ]
-        },
-        {
-          "Name": "SelectChildren",
-          "Arguments": [
-            "name"
-          ]
-        },
-        {
-          "Name": "SelectDescendants",
-          "Arguments": [
-            "name"
-          ]
-        },
-        {
           "Name": "SelectSingleNode",
           "Arguments": [
             "xpath"
@@ -1923,19 +1863,10 @@
       "TaintTypes": [
         "SqlInjection"
       ],
-      "IsAnyStringParameterInConstructorASink": true,
       "IsInterface": true,
       "Properties": [
         "CommandText"
       ]
-    },
-    {
-      "Type": "System.Data.IDataAdapter",
-      "TaintTypes": [
-        "SqlInjection"
-      ],
-      "IsAnyStringParameterInConstructorASink": true,
-      "IsInterface": true
     },
     {
       "Type": "MySql.Data.MySqlClient.MySqlHelper",
