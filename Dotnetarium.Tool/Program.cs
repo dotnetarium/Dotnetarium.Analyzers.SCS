@@ -34,11 +34,15 @@ internal static class Program
                 new ConfigurationReader().GetProjectConfiguration(
                     ImmutableArray.Create<AdditionalText>(new FileAdditionalText(options.ConfigPath)));
 
-            MSBuildLocator.RegisterDefaults();
-
             var target = Path.GetFullPath(options.Target);
             if (!File.Exists(target))
                 throw new FileNotFoundException("Project or solution was not found.", target);
+            var root = Path.GetDirectoryName(target)!;
+            var sdkQuery = VisualStudioInstanceQueryOptions.Default;
+            sdkQuery.WorkingDirectory = root;
+            var sdk = MSBuildLocator.QueryVisualStudioInstances(sdkQuery).FirstOrDefault() ??
+                throw new InvalidOperationException("No compatible .NET SDK was found.");
+            MSBuildLocator.RegisterInstance(sdk);
 
             using var workspace = MSBuildWorkspace.Create();
             var workspaceErrors = new List<string>();
@@ -99,7 +103,6 @@ internal static class Program
                 Console.Error.WriteLine("Workspace: " + error);
             compilerErrors |= workspaceFailure;
 
-            var root = Path.GetDirectoryName(target)!;
             var findings = diagnostics
                 .GroupBy(diagnostic => new
                 {
@@ -133,7 +136,7 @@ internal static class Program
             }
             if (options.SarifPath != null)
                 await SarifWriter.WriteAsync(options.SarifPath, target, findings);
-            return options.FailOnFindings && findings.Length > 0 ? 1 : 0;
+            return options.Fail && findings.Length > 0 ? 1 : 0;
         }
         catch (System.Text.Json.JsonException error)
         {
@@ -151,7 +154,7 @@ internal static class Program
         "Usage: dotnetarium <solution.sln|project.csproj> [options]\n" +
         "  --sarif <path>             Write SARIF 2.1.0\n" +
         "  --config <path>            Load Dotnetarium.json (version 2.0)\n" +
-        "  --fail-on-findings         Return 1 when findings are present\n" +
+        "  --fail                     Return 1 when findings are present\n" +
         "  -h, --help                 Show this help");
 
     private sealed class FileAdditionalText(string path) : AdditionalText
@@ -164,7 +167,7 @@ internal static class Program
     }
 
     private sealed record Options(string Target, string? SarifPath, string? ConfigPath,
-        bool FailOnFindings)
+        bool Fail)
     {
         internal static Options Parse(string[] args)
         {
@@ -179,7 +182,7 @@ internal static class Program
                 {
                     case "--sarif": sarif = NextValue(); break;
                     case "--config": config = NextValue(); break;
-                    case "--fail-on-findings": fail = true; break;
+                    case "--fail": fail = true; break;
                     default:
                         if (arg.StartsWith("-", StringComparison.Ordinal))
                             throw new ArgumentException($"Unknown option {arg}.");

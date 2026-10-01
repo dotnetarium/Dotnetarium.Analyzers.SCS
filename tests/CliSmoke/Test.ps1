@@ -83,13 +83,23 @@ if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
 $tool = Join-Path $toolPath 'dotnetarium.exe'
 $help = & $tool --help
 if ($LASTEXITCODE -ne 0 -or -not ($help -match '--sarif') -or
-    -not ($help -match '--fail-on-findings') -or
-    ($help -match '--sdk-path|--sarif-absolute-paths|--cwe|--export|--fail-any-warn')) {
+    -not ($help -match '--fail\b') -or
+    ($help -match '--sdk-path|--sarif-absolute-paths|--cwe|--export|--fail-any-warn|--fail-on-findings')) {
     throw 'CLI help does not match the simplified options.'
 }
 $sarif = Join-Path $scratch 'results.sarif'
-$scanOutput = & $tool $project --sarif $sarif --fail-on-findings
-if ($LASTEXITCODE -ne 1) { throw 'CLI did not report security findings with exit code 1.' }
+$launcher = Join-Path $scratch 'launcher'
+New-Item -ItemType Directory -Path $launcher | Out-Null
+'{"sdk":{"version":"8.0.100","rollForward":"disable"}}' |
+    Set-Content -LiteralPath (Join-Path $launcher 'global.json') -Encoding utf8
+Push-Location $launcher
+try {
+    $scanOutput = & $tool $project --sarif $sarif --fail
+    $scanExitCode = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
+if ($scanExitCode -ne 1) { throw 'CLI did not scan from a directory with a different SDK pin.' }
 if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default CWE groups.' }
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
@@ -133,7 +143,7 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
-& $tool $project --fail-on-findings | Out-Null
+& $tool $project --fail | Out-Null
 if ($LASTEXITCODE -ne 1) { throw 'Global tool did not find the .NET 8 flows.' }
 
 $config = Join-Path $scratch 'custom.json'

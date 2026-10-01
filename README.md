@@ -16,10 +16,12 @@ The analyzer targets `netstandard2.0` for the Roslyn host and uses Roslyn 5.0, w
 ## Scan
 
 ```powershell
-dotnetarium MyApp.sln --sarif results.sarif --fail-on-findings
+dotnetarium MyApp.sln --sarif results.sarif --fail
 ```
 
 SARIF source paths are relative to the solution or project directory. CWE groups appear in console output and SARIF rule metadata by default. Run `dotnetarium --help` for all options.
+
+The tool discovers an installed .NET SDK using the scanned solution or project directory, so a nearby `global.json` selects the SDK when several are installed. The .NET 10 runtime is required to run the global tool. The SDK needed to load a project must also be installed; the project's target framework alone does not select it.
 
 ## Moving from 1.x
 
