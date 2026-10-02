@@ -326,7 +326,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             {
                 // If the property/field reference itself is a tainted data source
                 if (operation is IPropertyReferenceOperation propertyReferenceOperation
-                    && this.DataFlowAnalysisContext.SourceInfos.IsSourceProperty(propertyReferenceOperation.Property))
+                    && this.DataFlowAnalysisContext.SourceInfos.IsSourceProperty(propertyReferenceOperation))
                 {
                     return TaintedDataAbstractValue.CreateTainted(propertyReferenceOperation.Member, propertyReferenceOperation.Syntax, this.OwningSymbol);
                 }

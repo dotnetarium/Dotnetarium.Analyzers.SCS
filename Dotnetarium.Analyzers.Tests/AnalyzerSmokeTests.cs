@@ -360,7 +360,7 @@ public sealed class AnalyzerSmokeTests
     }
 
     [Fact]
-    public async Task Mixed_AsParameters_aggregate_does_not_taint_injected_service()
+    public async Task Mixed_AsParameters_aggregate_taints_request_member_but_not_service()
     {
         var diagnostics = await AnalyzeAsync("""
             using Microsoft.AspNetCore.Builder;
@@ -376,7 +376,83 @@ public sealed class AnalyzerSmokeTests
             {
                 public static void Map(WebApplication app) =>
                     app.MapGet("/go", ([AsParameters] Request request) =>
-                        Results.Redirect(request.Destination.Url));
+                    {
+                        _ = Results.Redirect(request.Url);
+                        return Results.Redirect(request.Destination.Url);
+                    });
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Named_handler_mixed_AsParameters_keeps_unannotated_service_clean()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public sealed class DestinationService { public string Url => "https://example.test"; }
+            public sealed class Request
+            {
+                [FromQuery] public string Url { get; set; } = "";
+                public DestinationService Destination { get; set; } = null!;
+            }
+            public class Demo
+            {
+                public static void Map(WebApplication app) => app.MapGet("/go", Go);
+                private static IResult Go([AsParameters] Request request)
+                {
+                    _ = Results.Redirect(request.Url);
+                    return Results.Redirect(request.Destination.Url);
+                }
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Constructor_bound_AsParameters_respects_service_binding_on_simple_member()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public record struct Request([FromQuery] string Url, [FromServices] string Destination);
+            public class Demo
+            {
+                public static void Map(WebApplication app) => app.MapGet("/go",
+                    ([AsParameters] Request request) =>
+                    {
+                        _ = Results.Redirect(request.Url);
+                        return Results.Redirect(request.Destination);
+                    });
+            }
+            """, new OpenRedirectTaintAnalyzer());
+
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0005"));
+    }
+
+    [Fact]
+    public async Task Aggregate_type_used_outside_a_route_is_not_a_request_source()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Mvc;
+            public sealed class Service { public string Value => "https://example.test"; }
+            public sealed class Request
+            {
+                [FromQuery] public string Url { get; set; } = "";
+                [FromServices] public Service Service { get; set; } = null!;
+            }
+            public class Demo
+            {
+                public static void Map(WebApplication app) => app.MapGet("/unused",
+                    ([AsParameters] Request request) => Results.Ok());
+                public static IResult Other(Request request) => Results.Redirect(request.Url);
             }
             """, new OpenRedirectTaintAnalyzer());
 

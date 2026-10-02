@@ -83,7 +83,9 @@ namespace Dotnetarium.Analyzers.Taint
             foreach (var lambda in graph.DescendantOperations<IFlowAnonymousFunctionOperation>(
                 OperationKind.FlowAnonymousFunction))
             {
-                if (!lambda.Symbol.Parameters.Any(parameter => sources.IsSourceParameter(parameter, types)))
+                if (!lambda.Symbol.Parameters.Any(parameter => sources.IsSourceParameter(parameter, types) ||
+                    parameter.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() ==
+                        "Microsoft.AspNetCore.Http.AsParametersAttribute")))
                     continue;
                 AnalyzeGraph(graph.GetAnonymousFunctionControlFlowGraph(lambda), lambda.Symbol);
             }
@@ -152,7 +154,7 @@ namespace Dotnetarium.Analyzers.Taint
                     switch (operation)
                     {
                         case IPropertyReferenceOperation property when
-                            sources.IsSourceProperty(property.Property):
+                            sources.IsSourceProperty(property):
                         case IFieldReferenceOperation field when
                             sources.IsSourceField(field.Field):
                         case IParameterReferenceOperation parameter when
