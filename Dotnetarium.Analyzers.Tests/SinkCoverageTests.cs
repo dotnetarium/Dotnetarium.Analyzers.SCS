@@ -72,6 +72,7 @@ public sealed partial class SinkCoverageTests
         new("Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions", "DNA0001", "_ = Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlRaw(null!, input);"),
         new("Microsoft.EntityFrameworkCore.RelationalQueryableExtensions", "DNA0001", "_ = Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.FromSqlRaw(null!, input);"),
         new("System.Net.Http.HttpClient", "DNA0011", "_ = new System.Net.Http.HttpClient().GetStringAsync(input);"),
+        new("Grpc.Net.Client.GrpcChannel", "DNA0011", "_ = Grpc.Net.Client.GrpcChannel.ForAddress(input);"),
         new("System.Net.Http.HttpRequestMessage", "DNA0011", "_ = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, input);"),
         new("Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript", "DNA0012", "_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.EvaluateAsync(input);")
     ];
@@ -150,7 +151,8 @@ public sealed partial class SinkCoverageTests
             MetadataReference.CreateFromFile(typeof(NSec.Cryptography.AeadAlgorithm).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Sodium.SecretBox).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Microsoft.Data.SqlClient.SqlCommand).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(MySqlConnector.MySqlCommand).Assembly.Location)
+            MetadataReference.CreateFromFile(typeof(MySqlConnector.MySqlCommand).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Grpc.Net.Client.GrpcChannel).Assembly.Location)
         }).ToArray();
 
     private static DiagnosticAnalyzer AnalyzerFor(string rule) => rule switch

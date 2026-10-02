@@ -97,6 +97,7 @@ namespace Dotnetarium.Config
         public string Name { get; set; }
         public bool? IsOverride { get; set; }
         public List<AttributeCheckData> OverriddenTypeAttributes { get; set; }
+        public string[] OverriddenTypes { get; set; }
         public Regex NameRegex => Name != null && Name.Length > 1 && Name[0] == '/' && Name[Name.Length - 1] == '/'
             ? new Regex(Name.Substring(1, Name.Length - 2), RegexOptions.Compiled)
             : null;
@@ -109,6 +110,7 @@ namespace Dotnetarium.Config
     internal sealed class Parameter
     {
         public string[] Types { get; set; }
+        public string[] Names { get; set; }
         public AttributeCheckIncludeExclude Attributes { get; set; }
     }
 

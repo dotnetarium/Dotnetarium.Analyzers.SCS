@@ -185,7 +185,8 @@ namespace Dotnetarium.Config
             if (entry.Dependency != null && entry.Dependency.Any(dependency =>
                 !provider.TryGetOrCreateTypeByMetadataName(dependency, out _)))
                 return false;
-            if (entry.Parameter?.Types == null && IsMinimalApiInputParameter(parameter, compilation))
+            if (entry.Parameter?.Types == null && entry.Parameter?.Names == null &&
+                IsMinimalApiInputParameter(parameter, compilation))
                 return true;
             if (parameter.ContainingSymbol is not IMethodSymbol method ||
                 method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet)
@@ -241,6 +242,11 @@ namespace Dotnetarium.Config
                         provider.TryGetOrCreateTypeByMetadataName(check.Type, out var attribute) &&
                         OverridesMethodDeclaredOnAttributedType(method, attribute)))
                     return false;
+                if (methodRule.OverriddenTypes?.Length > 0 &&
+                    !methodRule.OverriddenTypes.Any(typeName =>
+                        provider.TryGetOrCreateTypeByMetadataName(typeName, out var expected) &&
+                        OverridesMethodDeclaredOnType(method, expected)))
+                    return false;
                 if (methodRule.IncludeConstructor == false && method.MethodKind == MethodKind.Constructor)
                     return false;
                 if (methodRule.IncludeConstructor == true && method.MethodKind != MethodKind.Constructor)
@@ -255,6 +261,8 @@ namespace Dotnetarium.Config
                     return false;
             }
 
+            if (entry.Parameter?.Names != null && !entry.Parameter.Names.Contains(parameter.Name))
+                return false;
             if (entry.Parameter?.Types != null && !entry.Parameter.Types.Any(typeName =>
                 provider.TryGetOrCreateTypeByMetadataName(typeName, out var expected) &&
                 parameter.Type is INamedTypeSymbol actual &&
@@ -404,6 +412,20 @@ namespace Dotnetarium.Config
                 overridden = overridden.OverriddenMethod)
             {
                 if (overridden.ContainingType.HasAnyAttribute(attribute))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool OverridesMethodDeclaredOnType(
+            IMethodSymbol method,
+            INamedTypeSymbol expected)
+        {
+            for (var overridden = method.OverriddenMethod; overridden != null;
+                overridden = overridden.OverriddenMethod)
+            {
+                if (SymbolEqualityComparer.Default.Equals(overridden.ContainingType.OriginalDefinition,
+                    expected.OriginalDefinition))
                     return true;
             }
             return false;

@@ -88,6 +88,17 @@
         ]
       }
     },
+    "GrpcServerInterceptor": {
+      "SourceType": "System.Object",
+      "Dependency": [ "Grpc.Core.Interceptors.Interceptor" ],
+      "Class": { "Parent": "Grpc.Core.Interceptors.Interceptor" },
+      "Method": {
+        "Name": "/^(UnaryServerHandler|ClientStreamingServerHandler|ServerStreamingServerHandler|DuplexStreamingServerHandler)$/",
+        "IsOverride": true,
+        "OverriddenTypes": [ "Grpc.Core.Interceptors.Interceptor" ]
+      },
+      "Parameter": { "Names": [ "request", "requestStream" ] }
+    },
     "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
       "Class": {
         "Accessibility": [
@@ -2214,6 +2225,11 @@
           ]
         }
       ]
+    },
+    {
+      "Type": "Grpc.Net.Client.GrpcChannel",
+      "TaintTypes": [ "ServerSideRequestForgery" ],
+      "Methods": [ { "Name": "ForAddress", "Arguments": [ "address" ] } ]
     },
     {
       "Type": "System.Net.Http.HttpRequestMessage",
