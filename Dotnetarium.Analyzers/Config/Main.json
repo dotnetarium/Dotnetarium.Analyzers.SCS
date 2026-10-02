@@ -60,6 +60,34 @@
         }
       }
     },
+    "GrpcService": {
+      "SourceType": "System.Object",
+      "Dependency": [
+        "Grpc.Core.BindServiceMethodAttribute",
+        "Google.Protobuf.IMessage"
+      ],
+      "Class": {
+        "Attributes": {
+          "Required": [
+            { "Type": "Grpc.Core.BindServiceMethodAttribute" }
+          ]
+        }
+      },
+      "Method": {
+        "IsOverride": true,
+        "OverriddenTypeAttributes": [
+          { "Type": "Grpc.Core.BindServiceMethodAttribute" }
+        ],
+        "IncludeConstructor": false,
+        "Static": false
+      },
+      "Parameter": {
+        "Types": [
+          "Google.Protobuf.IMessage",
+          "Grpc.Core.IAsyncStreamReader`1"
+        ]
+      }
+    },
     "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
       "Class": {
         "Accessibility": [
@@ -85,6 +113,10 @@
     }
   },
   "TaintSources": [
+    {
+      "Type": "Grpc.Core.ServerCallContext",
+      "Properties": [ "RequestHeaders" ]
+    },
     {
       "Type": "Microsoft.AspNetCore.Mvc.RazorPages.PageModel",
       "PropertyAttributes": [

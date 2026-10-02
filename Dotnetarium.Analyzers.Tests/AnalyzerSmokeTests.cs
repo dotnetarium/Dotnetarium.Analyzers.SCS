@@ -767,11 +767,82 @@ public sealed class AnalyzerSmokeTests
         Assert.Contains(findings, diagnostic => diagnostic.GetMessage().Contains("cross-site", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Grpc_service_requests_stream_messages_and_headers_are_untrusted()
+    {
+        var source = """
+            using System.Diagnostics;
+            using System.Threading.Tasks;
+            using Google.Protobuf.WellKnownTypes;
+            using Grpc.Core;
+
+            [BindServiceMethod(typeof(GeneratedService), "BindService")]
+            public abstract class GeneratedServiceBase
+            {
+                public virtual Task Unary(StringValue request, ServerCallContext context) => Task.CompletedTask;
+                public virtual Task Upload(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context) => Task.CompletedTask;
+                public virtual Task UploadAll(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context) => Task.CompletedTask;
+            }
+            public static class GeneratedService { }
+
+            public abstract class ServiceHelperBase : GeneratedServiceBase
+            {
+                public virtual Task HelperOverride(StringValue local) => Task.CompletedTask;
+            }
+
+            public sealed class Service : ServiceHelperBase
+            {
+                public override Task Unary(StringValue request, ServerCallContext context)
+                {
+                    _ = Process.Start(request.Value);
+                    _ = Process.Start(context.RequestHeaders.GetValue("x-file"));
+                    _ = Process.Start(context.Method);
+                    _ = Process.Start(new Metadata().GetValue("local")!);
+                    return Task.CompletedTask;
+                }
+
+                public override async Task Upload(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context)
+                {
+                    if (await requestStream.MoveNext())
+                        _ = Process.Start(requestStream.Current.Value);
+                }
+
+                public override async Task UploadAll(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context)
+                {
+                    await foreach (var message in requestStream.ReadAllAsync())
+                        _ = Process.Start(message.Value);
+                }
+
+                public void Helper(StringValue local) => _ = Process.Start(local.Value);
+                public override Task HelperOverride(StringValue local)
+                {
+                    _ = Process.Start(local.Value);
+                    return Task.CompletedTask;
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source, new CommandInjectionTaintAnalyzer());
+
+        var findings = diagnostics.Where(diagnostic => diagnostic.Id == "DNA0002").ToArray();
+        Assert.Equal(4, findings.Length);
+        var reportedLines = findings.Select(diagnostic =>
+            source.Split('\n')[diagnostic.Location.GetLineSpan().StartLinePosition.Line]).ToArray();
+        Assert.Contains(reportedLines, line => line.Contains("request.Value", StringComparison.Ordinal));
+        Assert.Contains(reportedLines, line => line.Contains("RequestHeaders.GetValue", StringComparison.Ordinal));
+        Assert.Contains(reportedLines, line => line.Contains("requestStream.Current.Value", StringComparison.Ordinal));
+        Assert.Contains(reportedLines, line => line.Contains("message.Value", StringComparison.Ordinal));
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source, params DiagnosticAnalyzer[] analyzers)
     {
         var trustedAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
         var references = trustedAssemblies.Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path))
+            .Concat([
+                MetadataReference.CreateFromFile(typeof(Grpc.Core.ServerCallContext).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Google.Protobuf.WellKnownTypes.StringValue).Assembly.Location),
+                MetadataReference.CreateFromFile(System.Reflection.Assembly.Load("Grpc.Net.Common").Location)
+            ])
             .ToArray();
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "Example.cs");
         var compilation = CSharpCompilation.Create("Example", new[] { tree }, references,

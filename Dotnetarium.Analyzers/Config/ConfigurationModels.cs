@@ -77,6 +77,7 @@ namespace Dotnetarium.Config
 
     internal sealed class TaintEntryPointData
     {
+        public string SourceType { get; set; }
         public HashSet<string> Dependency { get; set; }
         public Class Class { get; set; }
         public Method Method { get; set; }
@@ -94,6 +95,8 @@ namespace Dotnetarium.Config
     internal sealed class Method
     {
         public string Name { get; set; }
+        public bool? IsOverride { get; set; }
+        public List<AttributeCheckData> OverriddenTypeAttributes { get; set; }
         public Regex NameRegex => Name != null && Name.Length > 1 && Name[0] == '/' && Name[Name.Length - 1] == '/'
             ? new Regex(Name.Substring(1, Name.Length - 2), RegexOptions.Compiled)
             : null;
@@ -105,6 +108,7 @@ namespace Dotnetarium.Config
 
     internal sealed class Parameter
     {
+        public string[] Types { get; set; }
         public AttributeCheckIncludeExclude Attributes { get; set; }
     }
 
@@ -118,6 +122,7 @@ namespace Dotnetarium.Config
     {
         public List<AttributeCheckData> Include { get; set; }
         public List<AttributeCheckData> Exclude { get; set; }
+        public List<AttributeCheckData> Required { get; set; }
     }
 
     internal sealed class AttributeCheckData
