@@ -23,6 +23,7 @@ namespace Dotnetarium.Analyzers
         public static readonly DiagnosticDescriptor FixedNonce = Create("DNA0015", "Fixed encryption IV or nonce", "'{0}' encrypts with a fixed IV or nonce; generate a fresh value for each encryption.", 329);
         public static readonly DiagnosticDescriptor WeakPbkdf2 = Create("DNA0016", "Low PBKDF2 work factor", "PBKDF2 iteration count {0} is too low for password-derived keys.", 916);
         public static readonly DiagnosticDescriptor HardcodedPqcPrivateKey = Create("DNA0017", "Hardcoded post-quantum private key", "'{0}' imports literal post-quantum private key material.", 321);
+        public static readonly DiagnosticDescriptor ExternalUriLaunch = Taint("DNA0018", "Untrusted external URI launch", 20);
 
         private static readonly IReadOnlyDictionary<string, int> CweById = new Dictionary<string, int>
         {
@@ -30,7 +31,7 @@ namespace Dotnetarium.Analyzers
             ["DNA0005"] = 601, ["DNA0006"] = 90, ["DNA0007"] = 643, ["DNA0008"] = 502,
             ["DNA0009"] = 798, ["DNA0010"] = 614, ["DNA0011"] = 918, ["DNA0012"] = 94,
             ["DNA0013"] = 327, ["DNA0014"] = 327, ["DNA0015"] = 329, ["DNA0016"] = 916,
-            ["DNA0017"] = 321
+            ["DNA0017"] = 321, ["DNA0018"] = 20
         };
 
         public static bool TryGetCwe(string id, out int cwe) => CweById.TryGetValue(id, out cwe);

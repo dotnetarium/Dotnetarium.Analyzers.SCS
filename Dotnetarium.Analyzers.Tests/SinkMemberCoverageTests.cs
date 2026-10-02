@@ -126,6 +126,10 @@ public sealed partial class SinkCoverageTests
                 $"_ = Sodium.{type}.Decrypt(new byte[1], new byte[{size}], new byte[32], null);");
 
         yield return M("System.Diagnostics.Process", "DNA0002", "Start", "_ = System.Diagnostics.Process.Start(input);");
+        yield return M("Godot.OS", "DNA0002", "Execute", "_ = Godot.OS.Execute(input, System.Array.Empty<string>());");
+        yield return M("Godot.OS", "DNA0002", "ExecuteWithPipe", "_ = Godot.OS.ExecuteWithPipe(input, System.Array.Empty<string>());");
+        yield return M("Godot.OS", "DNA0002", "CreateProcess", "_ = Godot.OS.CreateProcess(input, System.Array.Empty<string>());");
+        yield return M("Godot.OS", "DNA0018", "ShellOpen", "_ = Godot.OS.ShellOpen(input);");
         yield return new MemberProbe("System.Diagnostics.ProcessStartInfo", "DNA0002", "C", ".ctor", "_ = new System.Diagnostics.ProcessStartInfo(input);");
         foreach (var member in new[] { "Arguments", "FileName" })
             yield return P("System.Diagnostics.ProcessStartInfo", "DNA0002", member,

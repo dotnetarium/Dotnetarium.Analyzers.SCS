@@ -123,6 +123,8 @@ namespace Dotnetarium.Config
     internal sealed class AttributeCheckData
     {
         public string Type { get; set; }
+        public int? ConstructorArgumentIndex { get; set; }
+        public int? ConstructorArgumentValue { get; set; }
         public List<Dictionary<object, object>> Condition { get; set; }
     }
 }

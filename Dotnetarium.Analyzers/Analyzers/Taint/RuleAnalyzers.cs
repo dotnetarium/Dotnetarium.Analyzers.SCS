@@ -17,7 +17,8 @@ namespace Dotnetarium.Analyzers.Taint
         CrossSiteScripting,
         LdapFilterInjection,
         ServerSideRequestForgery,
-        DynamicCodeExecution
+        DynamicCodeExecution,
+        ExternalUriLaunch
     }
 
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -87,5 +88,12 @@ namespace Dotnetarium.Analyzers.Taint
     {
         protected override SinkKind SinkKind => (SinkKind)(int)TaintType.DynamicCodeExecution;
         protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor => DnaRuleCatalog.DynamicCodeExecution;
+    }
+
+    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+    public sealed class ExternalUriLaunchTaintAnalyzer : TaintAnalyzer
+    {
+        protected override SinkKind SinkKind => (SinkKind)(int)TaintType.ExternalUriLaunch;
+        protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor => DnaRuleCatalog.ExternalUriLaunch;
     }
 }

@@ -240,6 +240,9 @@ namespace Dotnetarium.Config
                     return false;
                 if (HasAnyMethodAttribute(method, provider, methodRule.Attributes?.Exclude))
                     return false;
+                if (methodRule.Attributes?.Include?.Count > 0 &&
+                    !HasAnyMethodAttribute(method, provider, methodRule.Attributes.Include))
+                    return false;
             }
 
             return !HasAnyParameterAttribute(parameter, provider, entry.Parameter?.Attributes?.Exclude);
@@ -380,7 +383,33 @@ namespace Dotnetarium.Config
             WellKnownTypeProvider provider,
             List<AttributeCheckData> checks) =>
             checks?.Any(check => provider.TryGetOrCreateTypeByMetadataName(check.Type, out var attribute) &&
-                symbol.HasDerivedMethodAttribute(attribute)) == true;
+                (check.ConstructorArgumentIndex.HasValue
+                    ? HasMethodAttributeArgument(symbol, attribute, check)
+                    : symbol.HasDerivedMethodAttribute(attribute))) == true;
+
+        private static bool HasMethodAttributeArgument(
+            IMethodSymbol symbol,
+            INamedTypeSymbol attribute,
+            AttributeCheckData check)
+        {
+            if (check.ConstructorArgumentIndex < 0 || !check.ConstructorArgumentValue.HasValue)
+                return false;
+
+            for (var method = symbol; method != null; method = method.OverriddenMethod)
+            {
+                if (method.GetAttributes().Any(applied =>
+                    applied.AttributeClass != null &&
+                    (SymbolEqualityComparer.Default.Equals(applied.AttributeClass, attribute) ||
+                     applied.AttributeClass.GetBaseTypes().Any(baseType =>
+                         SymbolEqualityComparer.Default.Equals(baseType, attribute))) &&
+                    applied.ConstructorArguments.Length > check.ConstructorArgumentIndex!.Value &&
+                    applied.ConstructorArguments[check.ConstructorArgumentIndex.Value].Value is object value &&
+                    (value is int intValue && intValue == check.ConstructorArgumentValue ||
+                     value is long longValue && longValue == check.ConstructorArgumentValue)))
+                    return true;
+            }
+            return false;
+        }
 
         private static bool HasAnyParameterAttribute(
             IParameterSymbol symbol,

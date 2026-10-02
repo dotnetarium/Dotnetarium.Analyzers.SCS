@@ -31,6 +31,8 @@ public sealed partial class SinkCoverageTests
         new("Sodium.SecretAeadChaCha20Poly1305IETF", "DNA0009", "_ = Sodium.SecretAeadChaCha20Poly1305IETF.Encrypt(new byte[1], new byte[12], new byte[32], null);", true),
         new("Sodium.SecretAeadXChaCha20Poly1305", "DNA0009", "_ = Sodium.SecretAeadXChaCha20Poly1305.Encrypt(new byte[1], new byte[24], new byte[32], null);", true),
         new("System.Diagnostics.Process", "DNA0002", "_ = System.Diagnostics.Process.Start(input);"),
+        new("Godot.OS", "DNA0002", "_ = Godot.OS.Execute(input, System.Array.Empty<string>());"),
+        new("Godot.OS", "DNA0018", "_ = Godot.OS.ShellOpen(input);"),
         new("System.Diagnostics.ProcessStartInfo", "DNA0002", "_ = new System.Diagnostics.ProcessStartInfo { FileName = input };"),
         new("System.DirectoryServices.DirectorySearcher", "DNA0006", "_ = new System.DirectoryServices.DirectorySearcher(input);"),
         new("System.DirectoryServices.DirectoryEntry", "DNA0006", "_ = new System.DirectoryServices.DirectoryEntry(input);"),
@@ -150,7 +152,8 @@ public sealed partial class SinkCoverageTests
             MetadataReference.CreateFromFile(typeof(NSec.Cryptography.AeadAlgorithm).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Sodium.SecretBox).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Microsoft.Data.SqlClient.SqlCommand).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(MySqlConnector.MySqlCommand).Assembly.Location)
+            MetadataReference.CreateFromFile(typeof(MySqlConnector.MySqlCommand).Assembly.Location),
+            MetadataReference.CreateFromFile(typeof(Godot.Node).Assembly.Location)
         }).ToArray();
 
     private static DiagnosticAnalyzer AnalyzerFor(string rule) => rule switch
@@ -165,6 +168,7 @@ public sealed partial class SinkCoverageTests
         "DNA0009" => new HardcodedPasswordAnalyzer(),
         "DNA0011" => new ServerSideRequestForgeryTaintAnalyzer(),
         "DNA0012" => new DynamicCodeExecutionTaintAnalyzer(),
+        "DNA0018" => new ExternalUriLaunchTaintAnalyzer(),
         _ => throw new ArgumentOutOfRangeException(nameof(rule))
     };
 
@@ -180,6 +184,7 @@ public sealed partial class SinkCoverageTests
         TaintType.HardcodedSecret => "DNA0009",
         TaintType.ServerSideRequestForgery => "DNA0011",
         TaintType.DynamicCodeExecution => "DNA0012",
+        TaintType.ExternalUriLaunch => "DNA0018",
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
 

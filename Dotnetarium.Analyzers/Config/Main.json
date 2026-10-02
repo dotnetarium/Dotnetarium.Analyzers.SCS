@@ -60,6 +60,23 @@
         }
       }
     },
+    "Godot.Node": {
+      "Class": {
+        "Parent": "Godot.Node"
+      },
+      "Method": {
+        "IncludeConstructor": false,
+        "Attributes": {
+          "Include": [
+            {
+              "Type": "Godot.RpcAttribute",
+              "ConstructorArgumentIndex": 0,
+              "ConstructorArgumentValue": 1
+            }
+          ]
+        }
+      }
+    },
     "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
       "Class": {
         "Accessibility": [
@@ -2198,6 +2215,26 @@
       ],
       "Properties": [
         "RequestUri"
+      ]
+    },
+    {
+      "Type": "Godot.OS",
+      "TaintTypes": [
+        "CommandInjection"
+      ],
+      "Methods": [
+        { "Name": "Execute", "Arguments": [ "path" ] },
+        { "Name": "ExecuteWithPipe", "Arguments": [ "path" ] },
+        { "Name": "CreateProcess", "Arguments": [ "path" ] }
+      ]
+    },
+    {
+      "Type": "Godot.OS",
+      "TaintTypes": [
+        "ExternalUriLaunch"
+      ],
+      "Methods": [
+        { "Name": "ShellOpen", "Arguments": [ "uri" ] }
       ]
     },
     {

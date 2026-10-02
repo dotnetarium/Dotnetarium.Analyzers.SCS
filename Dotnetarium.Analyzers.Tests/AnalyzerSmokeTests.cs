@@ -767,11 +767,62 @@ public sealed class AnalyzerSmokeTests
         Assert.Contains(findings, diagnostic => diagnostic.GetMessage().Contains("cross-site", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Godot_any_peer_rpc_parameters_reach_process_and_uri_sinks()
+    {
+        var source = """
+            using Godot;
+            public partial class NetworkNode : Node
+            {
+                [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
+                private void Unsafe(string executable, string destination)
+                {
+                    _ = OS.Execute(executable, System.Array.Empty<string>());
+                    _ = OS.ExecuteWithPipe(executable, System.Array.Empty<string>());
+                    _ = OS.CreateProcess(executable, System.Array.Empty<string>());
+                    _ = OS.ShellOpen(destination);
+                }
+
+                [Rpc(MultiplayerApi.RpcMode.Authority)]
+                private void AuthorityOnly(string executable) => _ = OS.Execute(executable, System.Array.Empty<string>());
+
+                [Rpc]
+                private void DefaultAuthority(string destination) => _ = OS.ShellOpen(destination);
+
+                [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
+                private void ConstantPath(string ignored) => _ = OS.Execute("fixed", System.Array.Empty<string>());
+            }
+            """;
+
+        var rpcTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+        var rpcCompilation = CSharpCompilation.Create("RpcProbe", [rpcTree],
+            ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path))
+                .Concat([MetadataReference.CreateFromFile(typeof(Godot.Node).Assembly.Location)]),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var unsafeMethod = rpcCompilation.GetTypeByMetadataName("NetworkNode")!.GetMembers("Unsafe")
+            .OfType<IMethodSymbol>().Single();
+        var rpcAttribute = unsafeMethod.GetAttributes().Single();
+        Assert.Equal(1L, rpcAttribute.ConstructorArguments[0].Value);
+        var config = new Dotnetarium.Config.TaintConfiguration(
+            new Dotnetarium.Config.ConfigurationReader().GetBuiltinConfiguration(), rpcCompilation);
+        var sources = config.GetSourceSymbolMap((Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis.SinkKind)100);
+        Assert.True(Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis.TaintedDataSymbolMapExtensions
+            .IsSourceParameter(sources, unsafeMethod.Parameters[0],
+                Analyzer.Utilities.WellKnownTypeProvider.GetOrCreate(rpcCompilation)));
+
+        var diagnostics = await AnalyzeAsync(source, new CommandInjectionTaintAnalyzer(), new ExternalUriLaunchTaintAnalyzer());
+
+        Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0002"));
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0018"));
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source, params DiagnosticAnalyzer[] analyzers)
     {
         var trustedAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
         var references = trustedAssemblies.Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path))
+            .Concat([MetadataReference.CreateFromFile(typeof(Godot.Node).Assembly.Location)])
             .ToArray();
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "Example.cs");
         var compilation = CSharpCompilation.Create("Example", new[] { tree }, references,
