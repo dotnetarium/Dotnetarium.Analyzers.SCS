@@ -32,6 +32,37 @@ constructor-injected ASP.NET Core controllers, unambiguous built-in
 conditional registrations, and unknown container behavior keep a wider set of
 possible targets; the analyzer does not execute dependency injection.
 
+## Engine limitation: mutable interface fields
+
+When a field is typed as an interface and can be reassigned, the engine may
+consider every implementation of that interface in the scanned project. A
+finding can therefore point into an unsafe implementation even when the field
+starts with a safe null object or dummy implementation and the scan finds no
+assignment to the unsafe one. The finding represents a possible dispatch
+target; it does not prove that the unsafe implementation is assigned at run
+time. This is especially relevant to public fields, which other code can
+replace.
+
+```csharp
+public IRepo Repo = new NullRepo(); // Mutable: another IRepo may be assigned.
+
+public void Search(string input) => Repo.Search(input);
+```
+
+If the default implementation is intended to remain in place, make the field
+`readonly` (preferably also `private`), or give it the concrete implementation
+type:
+
+```csharp
+private readonly IRepo _repo = new NullRepo();
+```
+
+The engine can then narrow the call to that implementation. If the field
+is intentionally replaceable, review the finding and its possible assignments;
+do not treat the initializer alone as proof that the call is safe. For
+background on why runtime dispatch and unseen writes complicate static data
+flow, see [CodeQL's data-flow overview](https://codeql.github.com/docs/writing-codeql-queries/about-data-flow-analysis/).
+
 ## Verification
 
 `Dotnetarium.Analyzers.Tests/` contains xUnit tests for rules and model
