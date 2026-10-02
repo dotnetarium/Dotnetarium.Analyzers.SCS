@@ -817,6 +817,62 @@ public sealed class AnalyzerSmokeTests
         Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0018"));
     }
 
+    [Fact]
+    public async Task Godot_expression_requires_untrusted_parse_and_exposed_instance()
+    {
+        Assert.Equal("expression", typeof(Godot.Expression).GetMethods()
+            .Single(method => method.Name == "Parse" && method.GetParameters()[1].ParameterType == typeof(string[]))
+            .GetParameters()[0].Name);
+        var diagnostics = await AnalyzeAsync("""
+            using Godot;
+            public partial class ExpressionNode : Node
+            {
+                [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
+                private void Dangerous(string text)
+                {
+                    var expression = new Expression();
+                    expression.Parse(text);
+                    _ = expression.Execute(baseInstance: this);
+                    _ = expression.Execute(baseInstance: this, constCallsOnly: false);
+                }
+
+                [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
+                private void Calculator(string text)
+                {
+                    var expression = new Expression();
+                    expression.Parse(text);
+                    _ = expression.Execute();
+                }
+
+                [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
+                private void ConstOnly(string text)
+                {
+                    var expression = new Expression();
+                    expression.Parse(text);
+                    _ = expression.Execute(baseInstance: this, constCallsOnly: true);
+                }
+
+                [Rpc(MultiplayerApi.RpcMode.Authority)]
+                private void AuthorityOnly(string text)
+                {
+                    var expression = new Expression();
+                    expression.Parse(text);
+                    _ = expression.Execute(baseInstance: this);
+                }
+
+                [Rpc(MultiplayerApi.RpcMode.AnyPeer)]
+                private void FixedExpression(string ignored)
+                {
+                    var expression = new Expression();
+                    expression.Parse("1 + 2");
+                    _ = expression.Execute(baseInstance: this);
+                }
+            }
+            """, new DynamicCodeExecutionTaintAnalyzer());
+
+        Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0012"));
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source, params DiagnosticAnalyzer[] analyzers)
     {
         var trustedAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;

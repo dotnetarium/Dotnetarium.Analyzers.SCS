@@ -75,7 +75,8 @@ public sealed partial class SinkCoverageTests
         new("Microsoft.EntityFrameworkCore.RelationalQueryableExtensions", "DNA0001", "_ = Microsoft.EntityFrameworkCore.RelationalQueryableExtensions.FromSqlRaw(null!, input);"),
         new("System.Net.Http.HttpClient", "DNA0011", "_ = new System.Net.Http.HttpClient().GetStringAsync(input);"),
         new("System.Net.Http.HttpRequestMessage", "DNA0011", "_ = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, input);"),
-        new("Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript", "DNA0012", "_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.EvaluateAsync(input);")
+        new("Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript", "DNA0012", "_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.EvaluateAsync(input);"),
+        new("Godot.Expression", "DNA0012", "var expression = new Godot.Expression(); expression.Parse(input); _ = expression.Execute(baseInstance: new Godot.Node());")
     ];
 
     [Fact]

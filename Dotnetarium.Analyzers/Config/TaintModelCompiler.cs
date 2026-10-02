@@ -497,22 +497,40 @@ namespace Dotnetarium.Config
                     sinkProperties: sink.Properties,
                     sinkMethodMatchingParameters:
                         (sink.Methods ?? Array.Empty<SinkMethod>())
-                            .Where(method => method.Condition != null)
+                            .Where(method => method.Condition != null || method.RequiresNonNullArgument != null ||
+                                method.RequiresFalseOrOmittedArgument != null)
                             .Select(method =>
                                 ((MethodMatcher)((name, arguments) =>
-                                    name == method.Name && method.Condition.All(condition =>
+                                    name == method.Name &&
+                                    (method.RequiresNonNullArgument == null || arguments.Any(argument =>
+                                        argument.Parameter?.Name == method.RequiresNonNullArgument &&
+                                        IsProvablyNonNull(argument.Value))) &&
+                                    (method.RequiresFalseOrOmittedArgument == null || !arguments.Any(argument =>
+                                        argument.Parameter?.Name == method.RequiresFalseOrOmittedArgument &&
+                                        (!argument.Value.ConstantValue.HasValue ||
+                                         !Equals(argument.Value.ConstantValue.Value, false)))) &&
+                                    (method.Condition == null || method.Condition.All(condition =>
                                         arguments.Any(argument =>
                                             argument.Parameter?.Name == condition.argName &&
                                             argument.Value.ConstantValue.HasValue &&
-                                            Equals(argument.Value.ConstantValue.Value, condition.value)))),
+                                            Equals(argument.Value.ConstantValue.Value, condition.value))))),
                                  method.Arguments ?? Array.Empty<string>())),
                     sinkMethodParameters:
                         (sink.Methods ?? Array.Empty<SinkMethod>())
-                            .Where(method => method.Condition == null)
+                            .Where(method => method.Condition == null && method.RequiresNonNullArgument == null &&
+                                method.RequiresFalseOrOmittedArgument == null)
                             .Select(method => (method.Name, method.Arguments ?? Array.Empty<string>())));
             }
 
             return builder.ToImmutableAndFree();
+        }
+
+        private static bool IsProvablyNonNull(IOperation value)
+        {
+            while (value is IConversionOperation conversion)
+                value = conversion.Operand;
+            return value is IInstanceReferenceOperation or IObjectCreationOperation ||
+                value.ConstantValue.HasValue && value.ConstantValue.Value != null;
         }
 
         private sealed class SourceDefinition

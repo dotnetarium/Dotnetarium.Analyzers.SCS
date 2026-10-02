@@ -47,6 +47,8 @@ namespace Dotnetarium.Config
         public string Name { get; set; }
         public string[] Arguments { get; set; }
         public (string argName, object value)[] Condition { get; set; }
+        public string RequiresNonNullArgument { get; set; }
+        public string RequiresFalseOrOmittedArgument { get; set; }
     }
 
     internal sealed class Sanitizer

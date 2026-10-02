@@ -841,6 +841,15 @@
   ],
   "Transfers": [
     {
+      "Type": "Godot.Expression",
+      "Methods": [
+        {
+          "Name": "Parse",
+          "InOut": [ { "expression": ".This" } ]
+        }
+      ]
+    },
+    {
       "Type": "System.Uri",
       "Methods": [
         {
@@ -2235,6 +2244,18 @@
       ],
       "Methods": [
         { "Name": "ShellOpen", "Arguments": [ "uri" ] }
+      ]
+    },
+    {
+      "Type": "Godot.Expression",
+      "TaintTypes": [ "DynamicCodeExecution" ],
+      "Methods": [
+        {
+          "Name": "Execute",
+          "Arguments": [ ".This" ],
+          "RequiresNonNullArgument": "baseInstance",
+          "RequiresFalseOrOmittedArgument": "constCallsOnly"
+        }
       ]
     },
     {

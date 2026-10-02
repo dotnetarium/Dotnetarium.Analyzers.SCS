@@ -234,5 +234,6 @@ public sealed partial class SinkCoverageTests
         yield return P("System.Net.Http.HttpRequestMessage", "DNA0011", "RequestUri", "new System.Net.Http.HttpRequestMessage().RequestUri = new System.Uri(input);");
         foreach (var member in new[] { "EvaluateAsync", "RunAsync" })
             yield return M("Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript", "DNA0012", member, $"_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.{member}(input);");
+        yield return M("Godot.Expression", "DNA0012", "Execute", "var expression = new Godot.Expression(); expression.Parse(input); _ = expression.Execute(baseInstance: new Godot.Node());");
     }
 }

@@ -351,7 +351,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(operation.Arguments);
                 if (operation.Constructor != null)
                 {
-                    ProcessTaintedDataEnteringInvocationOrCreation(operation.Constructor, operation.Arguments, taintedArguments, operation);
+                    ProcessTaintedDataEnteringInvocationOrCreation(operation.Constructor, null, operation.Arguments, taintedArguments, operation);
                 }
 
                 return baseValue;
@@ -382,7 +382,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                         CurrentAnalysisData = GetClonedAnalysisData(inputAnalysisData);
                         var targetResult = base.VisitInvocation_NonLambdaOrDelegateOrLocalFunction(
                             target, visitedInstance, visitedArguments, invokedAsDelegate, originalOperation, defaultValue);
-                        ProcessTaintedDataEnteringInvocationOrCreation(target, visitedArguments, taintedArguments, originalOperation);
+                        ProcessTaintedDataEnteringInvocationOrCreation(target, visitedInstance, visitedArguments, taintedArguments, originalOperation);
                         result = ValueDomain.Merge(result, targetResult);
 
                         if (mergedAnalysisData == null)
@@ -401,7 +401,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                     CurrentAnalysisData = mergedAnalysisData!;
                 }
 
-                ProcessTaintedDataEnteringInvocationOrCreation(method, visitedArguments, taintedArguments, originalOperation);
+                ProcessTaintedDataEnteringInvocationOrCreation(method, visitedInstance, visitedArguments, taintedArguments, originalOperation);
 
                 PooledHashSet<string>? taintedTargets = null;
                 PooledHashSet<(string, string)>? taintedParameterPairs = null;
@@ -699,7 +699,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 TaintedDataAbstractValue baseValue = base.VisitInvocation_LocalFunction(localFunction, visitedArguments, originalOperation, defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                ProcessTaintedDataEnteringInvocationOrCreation(localFunction, visitedArguments, taintedArguments, originalOperation);
+                ProcessTaintedDataEnteringInvocationOrCreation(localFunction, null, visitedArguments, taintedArguments, originalOperation);
 
                 return baseValue;
             }
@@ -710,7 +710,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 TaintedDataAbstractValue baseValue = base.VisitInvocation_Lambda(lambda, visitedArguments, originalOperation, defaultValue);
 
                 IEnumerable<IArgumentOperation> taintedArguments = GetTaintedArguments(visitedArguments);
-                ProcessTaintedDataEnteringInvocationOrCreation(lambda.Symbol, visitedArguments, taintedArguments, originalOperation);
+                ProcessTaintedDataEnteringInvocationOrCreation(lambda.Symbol, null, visitedArguments, taintedArguments, originalOperation);
 
                 return baseValue;
             }
@@ -827,10 +827,12 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             /// static state or capture a tainted local variable.
             /// </summary>
             /// <param name="targetMethod">Method being invoked.</param>
+            /// <param name="visitedInstance">Receiver of an instance method, if any.</param>
             /// <param name="taintedArguments">Arguments with tainted data to the method.</param>
             /// <param name="originalOperation">Original IOperation for the method/constructor invocation.</param>
             private void ProcessTaintedDataEnteringInvocationOrCreation(
                 IMethodSymbol targetMethod,
+                IOperation? visitedInstance,
                 ImmutableArray<IArgumentOperation> allArguments,
                 IEnumerable<IArgumentOperation> taintedArguments,
                 IOperation originalOperation)
@@ -866,6 +868,29 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                                 this.TrackTaintedDataEnteringSink(taintedArgument.Parameter, taintedArgument.Syntax.GetLocation(), sinkKinds, abstractValue.SourceOrigins);
                             }
                         }
+                    }
+                }
+
+                if (targetMethod.ContainingType != null && visitedInstance != null)
+                {
+                    var receiverValue = this.GetCachedAbstractValue(visitedInstance);
+                    if (receiverValue.Kind == TaintedDataAbstractValueKind.Tainted)
+                    {
+                        var sinkKinds = new HashSet<SinkKind>();
+                        foreach (var sinkInfo in this.DataFlowAnalysisContext.SinkInfos.GetInfosForType(targetMethod.ContainingType))
+                        {
+                            if (sinkInfo.SinkMethodParameters.TryGetValue(targetMethod.Name, out var parameters) &&
+                                parameters.Contains(TaintedTargetValue.This))
+                                sinkKinds.UnionWith(sinkInfo.SinkKinds);
+
+                            foreach (var (matches, matchedParameters) in sinkInfo.SinkMethodMatchingParameters)
+                                if (matchedParameters.Contains(TaintedTargetValue.This) && matches(targetMethod.Name, allArguments))
+                                    sinkKinds.UnionWith(sinkInfo.SinkKinds);
+                        }
+
+                        if (sinkKinds.Count > 0)
+                            this.TrackTaintedDataEnteringSink(targetMethod, originalOperation.Syntax.GetLocation(),
+                                sinkKinds, receiverValue.SourceOrigins);
                     }
                 }
 
