@@ -13,6 +13,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
     internal delegate bool ValueContentCheck(ImmutableArray<PointsToAbstractValue> pointsTos, ImmutableArray<ValueContentAbstractValue> valueContents);
     internal delegate bool MethodMatcher(string methodName, ImmutableArray<IArgumentOperation> arguments);
     internal delegate bool ParameterMatcher(IParameterSymbol parameter, WellKnownTypeProvider wellKnownTypeProvider);
+    internal delegate bool PropertyReferenceMatcher(IPropertyReferenceOperation property);
     internal delegate bool ArrayLengthMatcher(int length);
 
     /// <summary>
@@ -50,7 +51,8 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             ImmutableHashSet<string>? taintedPropertyAttributes = null,
             bool preserveTaintOnConversion = false,
             bool taintRoutedParameters = false,
-            ImmutableHashSet<string>? serverBoundPropertyAttributes = null)
+            ImmutableHashSet<string>? serverBoundPropertyAttributes = null,
+            PropertyReferenceMatcher? propertyReferenceMatcher = null)
         {
             FullTypeName = fullTypeName ?? throw new ArgumentNullException(nameof(fullTypeName));
             IsInterface = isInterface;
@@ -59,6 +61,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             PreserveTaintOnConversion = preserveTaintOnConversion;
             TaintRoutedParameters = taintRoutedParameters;
             ServerBoundPropertyAttributes = serverBoundPropertyAttributes ?? ImmutableHashSet<string>.Empty;
+            PropertyReferenceMatcher = propertyReferenceMatcher;
             TaintedArguments = taintedArguments ?? throw new ArgumentNullException(nameof(taintedArguments));
             TaintedMethods = taintedMethods ?? throw new ArgumentNullException(nameof(taintedMethods));
             TaintedMethodsNeedsPointsToAnalysis = taintedMethodsNeedsPointsToAnalysis ?? throw new ArgumentNullException(nameof(taintedMethodsNeedsPointsToAnalysis));
@@ -94,6 +97,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             PreserveTaintOnConversion = false;
             TaintRoutedParameters = false;
             ServerBoundPropertyAttributes = ImmutableHashSet<string>.Empty;
+            PropertyReferenceMatcher = null;
             TaintedArguments = ImmutableHashSet<ParameterMatcher>.Empty;
             TaintedMethods = taintedMethods ?? throw new ArgumentNullException(nameof(taintedMethods));
             TaintedMethodsNeedsPointsToAnalysis = taintedMethodsNeedsPointsToAnalysis ?? throw new ArgumentNullException(nameof(taintedMethodsNeedsPointsToAnalysis));
@@ -146,6 +150,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
         /// <summary>Properties bound during server rendering, except in explicitly client-only components.</summary>
         public ImmutableHashSet<string> ServerBoundPropertyAttributes { get; }
+
+        /// <summary>Matches input properties whose source depends on the accessed instance.</summary>
+        public PropertyReferenceMatcher? PropertyReferenceMatcher { get; }
 
         /// <summary>
         /// Methods that generate tainted data.
@@ -259,6 +266,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             hashCode.Add(this.PreserveTaintOnConversion.GetHashCode());
             hashCode.Add(this.TaintRoutedParameters.GetHashCode());
             HashUtilities.Combine(this.ServerBoundPropertyAttributes, ref hashCode);
+            hashCode.Add(this.PropertyReferenceMatcher?.GetHashCode());
             HashUtilities.Combine(this.TaintedMethods, ref hashCode);
             HashUtilities.Combine(this.TaintedArguments, ref hashCode);
             HashUtilities.Combine(this.TaintedMethodsNeedsPointsToAnalysis, ref hashCode);
@@ -288,6 +296,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 && this.PreserveTaintOnConversion == other.PreserveTaintOnConversion
                 && this.TaintRoutedParameters == other.TaintRoutedParameters
                 && this.ServerBoundPropertyAttributes == other.ServerBoundPropertyAttributes
+                && this.PropertyReferenceMatcher == other.PropertyReferenceMatcher
                 && this.TaintedMethods == other.TaintedMethods
                 && this.TaintedArguments == other.TaintedArguments
                 && this.TaintedMethodsNeedsPointsToAnalysis == other.TaintedMethodsNeedsPointsToAnalysis

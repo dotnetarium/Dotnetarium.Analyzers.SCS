@@ -174,6 +174,15 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             return false;
         }
 
+        public static bool IsSourceProperty(this TaintedDataSymbolMap<SourceInfo> sourceSymbolMap, IPropertyReferenceOperation property)
+        {
+            if (sourceSymbolMap.IsSourceProperty(property.Property))
+                return true;
+
+            return sourceSymbolMap.GetInfosForType(property.Property.ContainingType)
+                .Any(info => info.PropertyReferenceMatcher?.Invoke(property) == true);
+        }
+
         private static bool IsRoutedComponentParameter(IPropertySymbol propertySymbol)
         {
             if (!propertySymbol.GetAttributes().Any(attribute =>
