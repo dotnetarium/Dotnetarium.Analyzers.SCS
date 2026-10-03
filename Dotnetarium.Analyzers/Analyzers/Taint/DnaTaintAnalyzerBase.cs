@@ -20,6 +20,7 @@ namespace Dotnetarium.Analyzers.Taint
         protected abstract DiagnosticDescriptor TaintedDataEnteringSinkDescriptor { get; }
         protected virtual IEnumerable<SinkKind> SinkKinds => new[] { SinkKind };
         protected virtual bool AnalyzeRazorGeneratedCode => false;
+        protected virtual bool IsSinkRelevant(Location location, Compilation compilation) => true;
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(TaintedDataEnteringSinkDescriptor);
@@ -76,22 +77,17 @@ namespace Dotnetarium.Analyzers.Taint
 
             AnalyzeGraph(graph, block.OwningSymbol);
 
-            // Route handlers are stored as delegates. RegisterOperationBlockAction
-            // receives their containing method, but the parent CFG never invokes
-            // the handler, so analyze each request-bound lambda as its own CFG.
-            var types = WellKnownTypeProvider.GetOrCreate(block.Compilation);
-            foreach (var lambda in graph.DescendantOperations<IFlowAnonymousFunctionOperation>(
-                OperationKind.FlowAnonymousFunction))
-            {
-                if (!lambda.Symbol.Parameters.Any(parameter => sources.IsSourceParameter(parameter, types) ||
-                    parameter.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() ==
-                        "Microsoft.AspNetCore.Http.AsParametersAttribute")))
-                    continue;
-                AnalyzeGraph(graph.GetAnonymousFunctionControlFlowGraph(lambda), lambda.Symbol);
-            }
-
             void AnalyzeGraph(Microsoft.CodeAnalysis.FlowAnalysis.ControlFlowGraph currentGraph, ISymbol owner)
             {
+                // Framework callbacks can be returned by factories, so descend into
+                // their nested CFGs as well as ordinary stored route delegates.
+                var types = WellKnownTypeProvider.GetOrCreate(block.Compilation);
+                foreach (var lambda in currentGraph.DescendantOperations<IFlowAnonymousFunctionOperation>(OperationKind.FlowAnonymousFunction))
+                    if (lambda.Symbol.Parameters.Any(parameter => sources.IsSourceParameter(parameter, types) ||
+                            parameter.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "Microsoft.AspNetCore.Http.AsParametersAttribute")) ||
+                        block.Compilation.GetSemanticModel(lambda.Syntax.SyntaxTree).GetOperation(lambda.Syntax) is { } body &&
+                            ContainsPotentialSource(ImmutableArray.Create(body), sources, block.Compilation))
+                        AnalyzeGraph(currentGraph.GetAnonymousFunctionControlFlowGraph(lambda), lambda.Symbol);
                 var result = TaintedDataAnalysis.TryGetOrComputeResult(
                     currentGraph,
                     block.Compilation,
@@ -111,6 +107,10 @@ namespace Dotnetarium.Analyzers.Taint
                 {
                     if (!pair.SinkKinds.Contains(kind))
                         continue;
+                    if (!IsSinkRelevant(pair.Sink.Location, block.Compilation)) continue;
+                    if (BoundaryValidation.HasConstantAllowlist(pair.Sink.Location, block.Compilation)) continue;
+                    if (kind == (SinkKind)(int)TaintType.PathEscape && BoundaryValidation.HasCanonicalPathRoot(pair.Sink.Location, block.Compilation)) continue;
+                    if (kind == (SinkKind)(int)TaintType.ServerSideRequestForgery && BoundaryValidation.HasFixedRequestAuthority(pair.Sink.Location, block.Compilation)) continue;
 
                     if (kind == (SinkKind)(int)TaintType.OpenRedirect &&
                         LocalRedirectGuard.Protects(pair.Sink.Location, block.Compilation))
@@ -156,7 +156,7 @@ namespace Dotnetarium.Analyzers.Taint
                         case IPropertyReferenceOperation property when
                             sources.IsSourceProperty(property):
                         case IFieldReferenceOperation field when
-                            sources.IsSourceField(field.Field):
+                            sources.IsSourceField(field):
                         case IParameterReferenceOperation parameter when
                             sources.IsSourceParameter(parameter.Parameter, types):
                             return true;

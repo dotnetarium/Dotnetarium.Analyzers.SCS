@@ -1,0 +1,8 @@
+@page "/server-event-probe"
+@rendermode InteractiveServer
+<input @bind="text" />
+@((MarkupString)text)
+@text
+@code {
+    private string text = "fixed";
+}

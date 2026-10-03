@@ -128,6 +128,13 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             return false;
         }
 
+        public static bool IsSourceField(this TaintedDataSymbolMap<SourceInfo> sources, IFieldReferenceOperation field) =>
+            sources.IsSourceField(field.Field) || sources.GetInfosForType(field.Field.ContainingType)
+                .Any(info => info.FieldReferenceMatcher?.Invoke(field) == true || info.FieldValueProvider?.Invoke(field) != null);
+
+        internal static TaintedDataAbstractValue? GetModeledFieldValue(this TaintedDataSymbolMap<SourceInfo> sources, IFieldReferenceOperation field) =>
+            sources.GetInfosForType(field.Field.ContainingType).Select(info => info.FieldValueProvider?.Invoke(field)).FirstOrDefault(value => value != null);
+
         /// <summary>
         /// Determines if the given property is a tainted data source.
         /// </summary>
@@ -180,8 +187,12 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 return true;
 
             return sourceSymbolMap.GetInfosForType(property.Property.ContainingType)
-                .Any(info => info.PropertyReferenceMatcher?.Invoke(property) == true);
+                .Any(info => info.PropertyReferenceMatcher?.Invoke(property) == true || info.PropertyValueProvider?.Invoke(property) != null);
         }
+
+        internal static TaintedDataAbstractValue? GetModeledPropertyValue(this TaintedDataSymbolMap<SourceInfo> sources, IPropertyReferenceOperation property) =>
+            sources.GetInfosForType(property.Property.ContainingType).Select(info => info.PropertyValueProvider?.Invoke(property))
+                .FirstOrDefault(value => value != null);
 
         private static bool IsRoutedComponentParameter(IPropertySymbol propertySymbol)
         {

@@ -1,0 +1,8 @@
+@page "/safe-event-probe"
+@rendermode InteractiveServer
+<input @onchange="Changed" />
+@((MarkupString)text)
+@code {
+    private string text = "fixed";
+    private void Changed(ChangeEventArgs args) { text = args.Value?.ToString() ?? ""; text = "fixed"; }
+}

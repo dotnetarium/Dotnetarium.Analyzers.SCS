@@ -1,0 +1,12 @@
+@page "/event-probe"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+<input @bind="text" />
+@((MarkupString)text)
+<RawChild Text="@text" />
+<Microsoft.AspNetCore.Components.Forms.InputText @bind-Value="other" />
+@((MarkupString)other)
+@text
+@code {
+    private string text = "fixed";
+    private string other = "fixed";
+}

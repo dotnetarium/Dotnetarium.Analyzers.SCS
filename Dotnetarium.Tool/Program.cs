@@ -90,7 +90,10 @@ internal static class Program
                         .ToImmutableArray();
                 else if (File.Exists(defaultConfig) && !additionalFiles.Any(file => IsConfigurationFile(file.Path)))
                     additionalFiles = additionalFiles.Add(new FileAdditionalText(defaultConfig));
-                var analyzerOptions = new AnalyzerOptions(additionalFiles, project.AnalyzerOptions.AnalyzerConfigOptionsProvider);
+                var configOptions = project.AnalyzerOptions.AnalyzerConfigOptionsProvider;
+                if (!configOptions.GlobalOptions.TryGetValue("build_property.IsTestProject", out _))
+                    configOptions = await ProjectAnalysisOptions.WithTestProjectMetadataAsync(configOptions, project.FilePath!, sdk.MSBuildPath);
+                var analyzerOptions = new AnalyzerOptions(additionalFiles, configOptions);
                 var result = await compilation.WithAnalyzers(analyzers, analyzerOptions).GetAllDiagnosticsAsync();
                 var projectErrors = result.Where(diagnostic =>
                     diagnostic.Id == "AD0001" ||

@@ -22,6 +22,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not create CLI fixture.' }
 using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Net.Security;
+using System.Net.WebSockets;
+using Microsoft.Extensions.Hosting;
 using System.IO;
 using System.IO.Pipelines;
 using System.Buffers;
@@ -38,6 +41,15 @@ using Npgsql;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using System.Xml;
+using MassTransit;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using Confluent.Kafka;
+using Azure.Messaging;
+using Azure.Messaging.EventHubs;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
 
 public class Demo
 {
@@ -55,9 +67,23 @@ public class Demo
             TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All
         };
         new Custom().Execute(input!);
+        _ = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
+        _ = new SocketsHttpHandler { SslOptions = new SslClientAuthenticationOptions { RemoteCertificateValidationCallback = (_, _, _, _) => true } };
+        _ = new SslStream(new MemoryStream(), false, (_, _, _, _) => true);
+        var socket = new ClientWebSocket();
+        socket.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        _ = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, errors) => errors == SslPolicyErrors.None };
     }
 }
 
+public static class DevelopmentTls
+{
+    public static void Configure(IHostEnvironment environment)
+    {
+        if (environment.IsDevelopment())
+            _ = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
+    }
+}
 public class Custom
 {
     public void Execute(string query) { }
@@ -108,7 +134,7 @@ public static class NetworkInput
         Process.Start(Encoding.UTF8.GetString(result.Buffer.ToArray()));
         if (context.Request.BodyReader.TryRead(out var available))
             Process.Start(Encoding.UTF8.GetString(available.Buffer.ToArray()));
-        var local = new Pipe();
+        var local = new System.IO.Pipelines.Pipe();
         var safe = await local.Reader.ReadAsync();
         Process.Start(Encoding.UTF8.GetString(safe.Buffer.ToArray()));
     }
@@ -129,6 +155,77 @@ public static class HubRegistration
     }
 }
 
+public sealed class MessageWorker : MassTransit.IConsumer<BodyInput>
+{
+    public Task Consume(ConsumeContext<BodyInput> context) { Process.Start(context.Message.Command); return Task.CompletedTask; }
+    public static void Configure(IServiceCollection services) => services.AddMassTransit(x => x.AddConsumer<MessageWorker>());
+}
+public static class BrokerInputs
+{
+    public static void Configure(IChannel channel, Confluent.Kafka.IConsumer<string, string> kafka)
+    {
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += (_, args) => { Process.Start(Encoding.UTF8.GetString(args.Body.Span)); return Task.CompletedTask; };
+        Process.Start(kafka.Consume(default(System.Threading.CancellationToken)).Message.Value);
+        Process.Start(new Confluent.Kafka.Message<string, string> { Value = "fixed" }.Value);
+    }
+}
+public sealed class EventInputs
+{
+    [Function("queue")] public void Queue([QueueTrigger("queue")] string value, HubService service) { Process.Start(value); Process.Start(service.Command); }
+    [Function("grid")] public void Grid([EventGridTrigger] CloudEvent value) => Process.Start(value.Data.ToString());
+    [Function("hub")] public void Hub([EventHubTrigger("hub")] EventData value) => Process.Start(value.EventBody.ToString());
+}
+public sealed class BoundInput
+{
+    public string Command { get; set; } = "fixed";
+    public string Fixed { get; set; } = "fixed";
+    public static ValueTask<BoundInput> BindAsync(HttpContext context) => new(new BoundInput { Command = context.Request.Query["command"] });
+}
+public static class CustomEndpoints
+{
+    public static void Configure(WebApplication app)
+    {
+        app.MapGet("/bound", (BoundInput input) => { Process.Start(input.Command); Process.Start(input.Fixed); });
+        app.MapGet("/filtered", (string input) => input).AddEndpointFilter((context, next) => { Process.Start(context.GetArgument<string>(0)); return next(context); });
+    }
+    public static async Task Buffer(HttpContext context)
+    {
+        var socket = await context.WebSockets.AcceptWebSocketAsync();
+        var first = new byte[128]; var second = new byte[128]; var view = first.AsMemory(); view = second.AsMemory();
+        await socket.ReceiveAsync(view, default);
+        Process.Start(Encoding.UTF8.GetString(second));
+        Process.Start(Encoding.UTF8.GetString(first));
+    }
+    public static void Xml(HttpContext context)
+    {
+        var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Parse, XmlResolver = new XmlUrlResolver() };
+        _ = XmlReader.Create(new StringReader(context.Request.Query["xml"]), settings);
+        _ = XmlReader.Create(new StringReader(context.Request.Query["xml"]), new XmlReaderSettings { DtdProcessing = DtdProcessing.Parse });
+    }
+    public static async Task Validated(HttpContext context, HttpClient client)
+    {
+        string input = context.Request.Query["value"];
+        if (input == "fixed") Process.Start(input);
+        var path = Path.GetFullPath(input);
+        if (path.StartsWith("/safe/", StringComparison.Ordinal)) File.ReadAllText(path);
+        await client.GetStringAsync("https://example.com/items/" + input);
+    }
+}
+public sealed class BrowserInput : ComponentBase
+{
+    private string value = "fixed";
+    private void Changed(ChangeEventArgs args) => value = args.Value.ToString();
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenElement(0, "input");
+        builder.AddAttribute(1, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, Changed));
+        builder.CloseElement();
+        builder.AddMarkupContent(2, value);
+        builder.AddContent(3, value);
+    }
+}
+
 namespace Newtonsoft.Json
 {
     public enum TypeNameHandling { None, All }
@@ -143,21 +240,29 @@ $projectXml = Get-Content -LiteralPath $project -Raw
 $packageReference = "  <ItemGroup><FrameworkReference Include=`"Microsoft.AspNetCore.App`" /><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Microsoft.Azure.Functions.Worker.Core`" Version=`"2.52.0`" /><PackageReference Include=`"Microsoft.Azure.Functions.Worker.Extensions.Http`" Version=`"3.3.0`" /><PackageReference Include=`"Microsoft.Azure.Functions.Worker.Extensions.ServiceBus`" Version=`"5.24.0`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
 $projectXml.Replace('</Project>', "$packageReference`n</Project>") |
     Set-Content -LiteralPath $project -Encoding utf8
+$extraPackages = '<ItemGroup><PackageReference Include="MassTransit" Version="9.2.3" /><PackageReference Include="RabbitMQ.Client" Version="7.2.2" /><PackageReference Include="Confluent.Kafka" Version="2.15.1" /><PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Storage.Queues" Version="5.5.5" /><PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.EventGrid" Version="3.6.0" /><PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.EventHubs" Version="6.5.0" /></ItemGroup>'
+(Get-Content -LiteralPath $project -Raw).Replace('</Project>', "$extraPackages`n</Project>") | Set-Content -LiteralPath $project -Encoding utf8
 $nugetConfig = Join-Path $scratch 'NuGet.Config'
 @"
 <?xml version="1.0" encoding="utf-8"?>
-<configuration><packageSources><clear /><add key="local" value="$feed" /><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>
+<configuration>
+  <packageSources><clear /><add key="local" value="$feed" /><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources>
+  <packageSourceMapping>
+    <packageSource key="local"><package pattern="Dotnetarium*" /></packageSource>
+    <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+  </packageSourceMapping>
+</configuration>
 "@ | Set-Content -LiteralPath $nugetConfig -Encoding utf8
 & dotnet restore $project --configfile $nugetConfig --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw 'CLI fixture restore failed.' }
 $buildOutput = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
 if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buildOutput -match 'DNA0002') -or
-    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011')) {
+    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011') -or -not ($buildOutput -match 'DNA0020')) {
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 10 findings.'
 }
 
-& dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --add-source $feed --ignore-failed-sources --no-cache
+& dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --configfile $nugetConfig --ignore-failed-sources --no-cache
 if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
 $tool = Join-Path $toolPath $(if ($IsWindows) { 'dotnetarium.exe' } else { 'dotnetarium' })
 $help = & $tool --help
@@ -183,16 +288,19 @@ if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default 
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
-    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 11 -or
+    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 20 -or
+    @($ids | Where-Object { $_ -eq 'DNA0003' }).Count -ne 1 -or
     @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
-    @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
+    @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1 -or
+    @($ids | Where-Object { $_ -eq 'DNA0020' }).Count -ne 4 -or
+    @($ids | Where-Object { $_ -eq 'DNA0021' }).Count -ne 1) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))
 }
 foreach ($result in $report.runs[0].results) {
     if ($result.locations[0].physicalLocation.artifactLocation.uri -ne 'Unsafe%20Input.cs' -or
         $result.locations[0].physicalLocation.artifactLocation.uriBaseId -ne '%SRCROOT%' -or
         $result.PSObject.Properties.Name -contains 'relatedLocations' -or
-        ($result.ruleId -ne 'DNA0008' -and @($result.codeFlows).Count -ne 1)) {
+        ($result.ruleId -notin @('DNA0008', 'DNA0020') -and @($result.codeFlows).Count -ne 1)) {
         throw ('Invalid relative path or engine flow for ' + $result.ruleId)
     }
     if ($report.runs[0].tool.driver.rules[$result.ruleIndex].id -ne $result.ruleId) {
@@ -200,6 +308,21 @@ foreach ($result in $report.runs[0].results) {
     }
 }
 $ruleIds = @($report.runs[0].tool.driver.rules | ForEach-Object id)
+$tlsRules = @($report.runs[0].tool.driver.rules | Where-Object id -eq 'DNA0020')
+if ($tlsRules.Count -ne 1 -or $tlsRules[0].defaultConfiguration.level -ne 'warning' -or
+    $tlsRules[0].properties.tags -notcontains 'CWE-295') {
+    throw 'TLS configuration findings must reference one warning rule with CWE-295 metadata.'
+}
+$xmlRules = @($report.runs[0].tool.driver.rules | Where-Object id -eq 'DNA0021')
+if ($xmlRules.Count -ne 1 -or $xmlRules[0].defaultConfiguration.level -ne 'warning' -or
+    $xmlRules[0].properties.tags -notcontains 'CWE-611') {
+    throw 'XXE findings must reference one warning rule with CWE-611 metadata.'
+}
+foreach ($result in @($report.runs[0].results | Where-Object ruleId -eq 'DNA0020')) {
+    if ($result.PSObject.Properties.Name -contains 'codeFlows') {
+        throw 'A TLS configuration finding must not invent a source-to-sink flow.'
+    }
+}
 if (@($ruleIds | Sort-Object -Unique).Count -ne $ruleIds.Count) {
     throw 'SARIF repeats a rule definition.'
 }
@@ -218,7 +341,7 @@ $projectXml.Replace('<TargetFramework>net10.0</TargetFramework>',
 if ($LASTEXITCODE -ne 0) { throw '.NET 8 fixture restore failed.' }
 $buildOutput = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
 if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buildOutput -match 'DNA0002') -or
-    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011')) {
+    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011') -or -not ($buildOutput -match 'DNA0020')) {
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
@@ -267,6 +390,41 @@ $badOutput = & $tool $project --config $bad 2>&1
 if ($LASTEXITCODE -ne 2 -or -not ($badOutput -match 'Invalid dotnetarium.json')) {
     throw 'CLI did not reject an invalid JSON rule field.'
 }
+
+# Test metadata suppresses only certificate bypasses, for both the package and CLI.
+$applicationProjectXml = Get-Content -LiteralPath $project -Raw
+$testProjectXml = $applicationProjectXml.Replace('</Project>', '<PropertyGroup><IsTestProject>true</IsTestProject></PropertyGroup></Project>')
+$testProjectXml | Set-Content -LiteralPath $project -Encoding utf8
+$testBuild = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
+if ($LASTEXITCODE -ne 0 -or ($testBuild -match 'DNA0020') -or -not ($testBuild -match 'DNA0001')) {
+    $testBuild | Write-Output
+    throw 'Analyzer package did not honor test-project metadata while preserving other rules.'
+}
+$testOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ($testOutput -match 'DNA0020') -or -not ($testOutput -match 'DNA0001')) {
+    throw 'CLI did not honor test-project metadata while preserving other rules.'
+}
+$globalConfig = Join-Path $projectPath '.globalconfig'
+"is_global = true`ndotnetarium_analyze_test_certificates = true" | Set-Content -LiteralPath $globalConfig -Encoding utf8
+$testOptInOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ([regex]::Matches(($testOptInOutput -join "`n"), 'DNA0020')).Count -ne 4) {
+    throw 'Test-project certificate opt-in did not restore CLI findings.'
+}
+Remove-Item -LiteralPath $globalConfig -Force
+
+# The tool must also read evaluated metadata without our NuGet props present.
+$testProjectXml.Replace("<PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" />", '') |
+    Set-Content -LiteralPath $project -Encoding utf8
+& dotnet restore $project --configfile $nugetConfig --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { throw 'Standalone CLI test fixture restore failed.' }
+$standaloneTestOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ($standaloneTestOutput -match 'DNA0020') -or -not ($standaloneTestOutput -match 'DNA0001')) {
+    $standaloneTestOutput | Write-Output
+    throw 'Standalone CLI did not read evaluated test-project metadata.'
+}
+$applicationProjectXml | Set-Content -LiteralPath $project -Encoding utf8
+& dotnet restore $project --configfile $nugetConfig --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { throw 'Application fixture restore failed.' }
 
 Add-Content -LiteralPath (Join-Path $projectPath 'Unsafe Input.cs') -Value 'class Broken { MissingType value; }'
 $incompleteSarif = Join-Path $scratch 'incomplete.sarif'

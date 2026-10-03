@@ -18,6 +18,20 @@ public sealed class AzureFunctionInputTests
     [InlineData("[Function(\"http\")] public void Run([HttpTrigger] HttpRequest request) { Process.Start(request.Query[\"command\"]); }", 1)]
     [InlineData("[Function(\"bus\")] public void Run([ServiceBusTrigger(\"queue\")] string body) { Process.Start(body); }", 1)]
     [InlineData("[Function(\"bus\")] public void Run([ServiceBusTrigger(\"queue\")] Input body) { Process.Start(body.Value); }", 1)]
+    [InlineData("[Function(\"queue\")] public void Run([QueueTrigger(\"queue\")] string body) { Process.Start(body); }", 1)]
+    [InlineData("[Function(\"queue\")] public void Run([QueueTrigger(\"queue\")] Input body) { Process.Start(body.Value); }", 1)]
+    [InlineData("[Function(\"queue\")] public void Run([QueueTrigger(\"queue\")] QueueMessage message) { Process.Start(message.MessageText); }", 1)]
+    [InlineData("[Function(\"grid\")] public void Run([EventGridTrigger] EventGridEvent message) { Process.Start(message.Data.ToString()); }", 1)]
+    [InlineData("[Function(\"grid\")] public void Run([EventGridTrigger] CloudEvent message) { Process.Start(message.Data.ToString()); }", 1)]
+    [InlineData("[Function(\"grid\")] public void Run([EventGridTrigger] string message) { Process.Start(message); }", 1)]
+    [InlineData("[Function(\"hub\")] public void Run([EventHubTrigger(\"hub\")] EventData message) { Process.Start(message.EventBody.ToString()); }", 1)]
+    [InlineData("[Function(\"hub\")] public void Run([EventHubTrigger(\"hub\")] EventData[] messages) { foreach (var message in messages) Process.Start(message.EventBody.ToString()); }", 1)]
+    [InlineData("[Function(\"hub\")] public void Run([EventHubTrigger(\"hub\")] string[] messages) { Process.Start(messages[0]); }", 1)]
+    [InlineData("[Function(\"hub\")] public void Run([EventHubTrigger(\"hub\")] EventData message) { Process.Start(message.Properties[\"command\"].ToString()); }", 1)]
+    [InlineData("[Function(\"queue\")] public void Run([QueueTrigger(\"queue\")] string body, FunctionContext context, Input service) { Process.Start(context.InvocationId); Process.Start(service.Value); }", 0)]
+    [InlineData("public void Helper([EventGridTrigger] CloudEvent message) { Process.Start(message.Data.ToString()); }", 0)]
+    [InlineData("[Function(\"output\")] [QueueOutput(\"queue\")] public Input Run(string value) { Process.Start(value); return new Input(); }", 0)]
+    [InlineData("public void Helper() { var message = new EventData(BinaryData.FromString(\"fixed\")); Process.Start(message.EventBody.ToString()); }", 0)]
     [InlineData("[Function(\"bus\")] public void Run([ServiceBusTrigger(\"queue\")] ServiceBusReceivedMessage message) { Process.Start(message.Body.ToString()); }", 1)]
     [InlineData("[Function(\"bus\")] public void Run([ServiceBusTrigger(\"queue\", IsBatched = true)] ServiceBusReceivedMessage[] messages) { foreach (var message in messages) Process.Start(message.Body.ToString()); }", 1)]
     [InlineData("[Function(\"bus\")] public void Run([ServiceBusTrigger(\"queue\", IsBatched = true)] string[] messages) { Process.Start(messages[0]); }", 1)]
@@ -38,6 +52,11 @@ public sealed class AzureFunctionInputTests
             using System.Text;
             using System.Threading.Tasks;
             using Azure.Messaging.ServiceBus;
+            using Azure;
+            using Azure.Messaging;
+            using Azure.Messaging.EventGrid;
+            using Azure.Messaging.EventHubs;
+            using Azure.Storage.Queues.Models;
             using Microsoft.Azure.Functions.Worker;
             using Microsoft.Azure.Functions.Worker.Http;
             using Microsoft.AspNetCore.Http;

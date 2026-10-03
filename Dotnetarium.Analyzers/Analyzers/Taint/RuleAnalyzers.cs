@@ -17,7 +17,8 @@ namespace Dotnetarium.Analyzers.Taint
         CrossSiteScripting,
         LdapFilterInjection,
         ServerSideRequestForgery,
-        DynamicCodeExecution
+        DynamicCodeExecution,
+        XmlExternalEntity
     }
 
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -87,5 +88,13 @@ namespace Dotnetarium.Analyzers.Taint
     {
         protected override SinkKind SinkKind => (SinkKind)(int)TaintType.DynamicCodeExecution;
         protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor => DnaRuleCatalog.DynamicCodeExecution;
+    }
+
+    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+    public sealed class XmlExternalEntityTaintAnalyzer : TaintAnalyzer
+    {
+        protected override SinkKind SinkKind => (SinkKind)(int)TaintType.XmlExternalEntity;
+        protected override DiagnosticDescriptor TaintedDataEnteringSinkDescriptor => DnaRuleCatalog.XmlExternalEntity;
+        protected override bool IsSinkRelevant(Location location, Compilation compilation) => UnsafeXmlModel.IsUnsafe(location, compilation);
     }
 }

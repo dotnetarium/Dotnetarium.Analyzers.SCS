@@ -17,6 +17,9 @@ public sealed partial class SinkCoverageTests
     // inheriting this type-level coverage without a corresponding witness.
     private static readonly SinkProbe[] Probes =
     [
+        new("System.Xml.XmlReader", "DNA0021", "_ = System.Xml.XmlReader.Create(new System.IO.StringReader(input), new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Parse, XmlResolver = new System.Xml.XmlUrlResolver() });"),
+        new("System.Xml.XmlDocument", "DNA0021", "new System.Xml.XmlDocument { XmlResolver = new System.Xml.XmlUrlResolver() }.LoadXml(input);"),
+        new("System.Xml.XmlTextReader", "DNA0021", "var reader = new System.Xml.XmlTextReader(new System.IO.StringReader(input)) { DtdProcessing = System.Xml.DtdProcessing.Parse, XmlResolver = new System.Xml.XmlUrlResolver() }; reader.Read();"),
         new("System.Net.NetworkCredential", "DNA0009", "_ = new System.Net.NetworkCredential(\"user\", \"secret\");", true),
         new("System.UriBuilder", "DNA0009", "_ = new System.UriBuilder { Password = \"secret\" };", true),
         new("System.Security.Cryptography.SymmetricAlgorithm", "DNA0009", "System.Security.Cryptography.Aes.Create().Key = new byte[32];", true),
@@ -167,6 +170,7 @@ public sealed partial class SinkCoverageTests
         "DNA0009" => new HardcodedPasswordAnalyzer(),
         "DNA0011" => new ServerSideRequestForgeryTaintAnalyzer(),
         "DNA0012" => new DynamicCodeExecutionTaintAnalyzer(),
+        "DNA0021" => new XmlExternalEntityTaintAnalyzer(),
         _ => throw new ArgumentOutOfRangeException(nameof(rule))
     };
 
@@ -182,6 +186,7 @@ public sealed partial class SinkCoverageTests
         TaintType.HardcodedSecret => "DNA0009",
         TaintType.ServerSideRequestForgery => "DNA0011",
         TaintType.DynamicCodeExecution => "DNA0012",
+        TaintType.XmlExternalEntity => "DNA0021",
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
 

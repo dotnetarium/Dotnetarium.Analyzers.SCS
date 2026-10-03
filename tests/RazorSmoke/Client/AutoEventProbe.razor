@@ -1,0 +1,8 @@
+@page "/auto-event-probe"
+@rendermode InteractiveAuto
+<input @onchange="Changed" />
+@((MarkupString)text)
+@code {
+    private string text = "fixed";
+    private void Changed(ChangeEventArgs args) => text = args.Value?.ToString() ?? "";
+}

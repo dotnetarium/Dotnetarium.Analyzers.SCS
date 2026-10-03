@@ -1,4 +1,7 @@
 <Project>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="IsTestProject" />
+  </ItemGroup>
   <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/dotnetarium.json')">
     <AdditionalFiles Include="$(MSBuildProjectDirectory)/dotnetarium.json" />
   </ItemGroup>

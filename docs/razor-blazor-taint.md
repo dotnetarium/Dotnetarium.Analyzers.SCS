@@ -22,5 +22,20 @@ component explicitly declares WebAssembly rendering with `prerender: false`.
 
 Ordinary string rendering through Razor or `AddContent(string)` is encoded.
 A plain `[Parameter]` is not a source unless its name appears in the
-component's route template. Taint from parent components to child parameters
-and from browser event callbacks into later renders is not yet modeled.
+component's route template, or an analyzed parent supplies untrusted data to it.
+
+Browser DOM event callbacks, native `@bind`, and framework `InputBase<T>`
+`ValueChanged` bindings carry input through component fields/properties into later
+renders. Source-defined parent render trees can pass that provenance into child
+`[Parameter]` properties. The same callback's constant overwrite stays clean.
+These sources are used only for XSS; they do not imply that a component executes
+server-only commands. A component without an explicit render mode may inherit
+interactivity from its parent.
+
+Callbacks must be connected to a DOM event or a recognized framework input;
+an unrelated component parameter named `onchange` is not an input source.
+Dynamic render-tree parameter names, cross-block component frame stacks,
+metadata-only child components, and arbitrary JavaScript interop input are not
+currently summarized. State across possible events is conservative: a separate
+reset handler cannot prove that every future render is clean. Prefer encoded
+output instead of relying on callback ordering to make raw HTML safe.

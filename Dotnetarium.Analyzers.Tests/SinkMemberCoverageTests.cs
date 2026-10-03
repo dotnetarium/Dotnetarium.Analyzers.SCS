@@ -32,6 +32,7 @@ public sealed partial class SinkCoverageTests
     private sealed record ExtraArgumentProbe(string Type, string Method, string Argument, string Statement);
     private static readonly ExtraArgumentProbe[] ExtraArgumentProbes =
     [
+        new("System.Xml.XmlDocument", "Load", "txtReader", "new System.Xml.XmlDocument { XmlResolver = new System.Xml.XmlUrlResolver() }.Load(new System.IO.StringReader(input));"),
         new("System.Diagnostics.Process", "Start", "arguments", "_ = System.Diagnostics.Process.Start(\"fixed\", input);"),
         new("System.IO.Directory", "CreateSymbolicLink", "pathToTarget", "_ = System.IO.Directory.CreateSymbolicLink(\"fixed\", input);"),
         new("System.IO.Directory", "Move", "destDirName", "System.IO.Directory.Move(\"fixed\", input);"),
@@ -94,6 +95,11 @@ public sealed partial class SinkCoverageTests
             new(type, rule, "M", member, statement);
         static MemberProbe P(string type, string rule, string member, string statement) =>
             new(type, rule, "P", member, statement);
+
+        yield return M("System.Xml.XmlReader", "DNA0021", "Create", "_ = System.Xml.XmlReader.Create(new System.IO.StringReader(input), new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Parse, XmlResolver = new System.Xml.XmlUrlResolver() });");
+        yield return M("System.Xml.XmlDocument", "DNA0021", "LoadXml", "new System.Xml.XmlDocument { XmlResolver = new System.Xml.XmlUrlResolver() }.LoadXml(input);");
+        yield return M("System.Xml.XmlDocument", "DNA0021", "Load", "new System.Xml.XmlDocument { XmlResolver = new System.Xml.XmlUrlResolver() }.Load(new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(input)));");
+        yield return M("System.Xml.XmlTextReader", "DNA0021", "Read", "var reader = new System.Xml.XmlTextReader(new System.IO.StringReader(input)) { DtdProcessing = System.Xml.DtdProcessing.Parse, XmlResolver = new System.Xml.XmlUrlResolver() }; reader.Read();");
 
         yield return M("System.Net.NetworkCredential", "DNA0009", ".ctor", "_ = new System.Net.NetworkCredential(\"user\", \"secret\");");
         yield return P("System.UriBuilder", "DNA0009", "Password", "new System.UriBuilder().Password = \"secret\";");
