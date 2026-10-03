@@ -22,6 +22,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not create CLI fixture.' }
 using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Net.Security;
+using System.Net.WebSockets;
+using Microsoft.Extensions.Hosting;
 using System.IO;
 using System.IO.Pipelines;
 using System.Buffers;
@@ -55,9 +58,23 @@ public class Demo
             TypeNameHandling = Newtonsoft.Json.TypeNameHandling.All
         };
         new Custom().Execute(input!);
+        _ = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
+        _ = new SocketsHttpHandler { SslOptions = new SslClientAuthenticationOptions { RemoteCertificateValidationCallback = (_, _, _, _) => true } };
+        _ = new SslStream(new MemoryStream(), false, (_, _, _, _) => true);
+        var socket = new ClientWebSocket();
+        socket.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        _ = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, errors) => errors == SslPolicyErrors.None };
     }
 }
 
+public static class DevelopmentTls
+{
+    public static void Configure(IHostEnvironment environment)
+    {
+        if (environment.IsDevelopment())
+            _ = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
+    }
+}
 public class Custom
 {
     public void Execute(string query) { }
@@ -146,18 +163,24 @@ $projectXml.Replace('</Project>', "$packageReference`n</Project>") |
 $nugetConfig = Join-Path $scratch 'NuGet.Config'
 @"
 <?xml version="1.0" encoding="utf-8"?>
-<configuration><packageSources><clear /><add key="local" value="$feed" /><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>
+<configuration>
+  <packageSources><clear /><add key="local" value="$feed" /><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources>
+  <packageSourceMapping>
+    <packageSource key="local"><package pattern="Dotnetarium*" /></packageSource>
+    <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+  </packageSourceMapping>
+</configuration>
 "@ | Set-Content -LiteralPath $nugetConfig -Encoding utf8
 & dotnet restore $project --configfile $nugetConfig --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw 'CLI fixture restore failed.' }
 $buildOutput = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
 if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buildOutput -match 'DNA0002') -or
-    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011')) {
+    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011') -or -not ($buildOutput -match 'DNA0020')) {
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 10 findings.'
 }
 
-& dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --add-source $feed --ignore-failed-sources --no-cache
+& dotnet tool install dotnetarium --version $toolVersion --tool-path $toolPath --configfile $nugetConfig --ignore-failed-sources --no-cache
 if ($LASTEXITCODE -ne 0) { throw 'Local global tool install failed.' }
 $tool = Join-Path $toolPath $(if ($IsWindows) { 'dotnetarium.exe' } else { 'dotnetarium' })
 $help = & $tool --help
@@ -185,14 +208,15 @@ $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
     @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 11 -or
     @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
-    @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
+    @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1 -or
+    @($ids | Where-Object { $_ -eq 'DNA0020' }).Count -ne 4) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))
 }
 foreach ($result in $report.runs[0].results) {
     if ($result.locations[0].physicalLocation.artifactLocation.uri -ne 'Unsafe%20Input.cs' -or
         $result.locations[0].physicalLocation.artifactLocation.uriBaseId -ne '%SRCROOT%' -or
         $result.PSObject.Properties.Name -contains 'relatedLocations' -or
-        ($result.ruleId -ne 'DNA0008' -and @($result.codeFlows).Count -ne 1)) {
+        ($result.ruleId -notin @('DNA0008', 'DNA0020') -and @($result.codeFlows).Count -ne 1)) {
         throw ('Invalid relative path or engine flow for ' + $result.ruleId)
     }
     if ($report.runs[0].tool.driver.rules[$result.ruleIndex].id -ne $result.ruleId) {
@@ -200,6 +224,16 @@ foreach ($result in $report.runs[0].results) {
     }
 }
 $ruleIds = @($report.runs[0].tool.driver.rules | ForEach-Object id)
+$tlsRules = @($report.runs[0].tool.driver.rules | Where-Object id -eq 'DNA0020')
+if ($tlsRules.Count -ne 1 -or $tlsRules[0].defaultConfiguration.level -ne 'warning' -or
+    $tlsRules[0].properties.tags -notcontains 'CWE-295') {
+    throw 'TLS configuration findings must reference one warning rule with CWE-295 metadata.'
+}
+foreach ($result in @($report.runs[0].results | Where-Object ruleId -eq 'DNA0020')) {
+    if ($result.PSObject.Properties.Name -contains 'codeFlows') {
+        throw 'A TLS configuration finding must not invent a source-to-sink flow.'
+    }
+}
 if (@($ruleIds | Sort-Object -Unique).Count -ne $ruleIds.Count) {
     throw 'SARIF repeats a rule definition.'
 }
@@ -218,7 +252,7 @@ $projectXml.Replace('<TargetFramework>net10.0</TargetFramework>',
 if ($LASTEXITCODE -ne 0) { throw '.NET 8 fixture restore failed.' }
 $buildOutput = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
 if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buildOutput -match 'DNA0002') -or
-    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011')) {
+    -not ($buildOutput -match 'DNA0008') -or -not ($buildOutput -match 'DNA0011') -or -not ($buildOutput -match 'DNA0020')) {
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
