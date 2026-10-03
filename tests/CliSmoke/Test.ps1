@@ -22,6 +22,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not create CLI fixture.' }
 using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.IO;
+using System.IO.Pipelines;
+using System.Buffers;
+using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.SignalR;
@@ -68,6 +72,23 @@ public sealed class InputHub : Hub
     public async Task Upload(IAsyncEnumerable<string> stream)
     {
         await foreach (var command in stream) Process.Start(command);
+    }
+}
+public static class NetworkInput
+{
+    public static async Task Run(HttpContext context)
+    {
+        var socket = await context.WebSockets.AcceptWebSocketAsync();
+        var bytes = new byte[128];
+        await socket.ReceiveAsync(bytes.AsMemory(), default);
+        Process.Start(Encoding.UTF8.GetString(bytes));
+        var result = await context.Request.BodyReader.ReadAsync();
+        Process.Start(Encoding.UTF8.GetString(result.Buffer.ToArray()));
+        if (context.Request.BodyReader.TryRead(out var available))
+            Process.Start(Encoding.UTF8.GetString(available.Buffer.ToArray()));
+        var local = new Pipe();
+        var safe = await local.Reader.ReadAsync();
+        Process.Start(Encoding.UTF8.GetString(safe.Buffer.ToArray()));
     }
 }
 public static class HubRegistration
@@ -140,7 +161,7 @@ if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default 
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
-    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 5 -or
+    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 8 -or
     @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
     @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))

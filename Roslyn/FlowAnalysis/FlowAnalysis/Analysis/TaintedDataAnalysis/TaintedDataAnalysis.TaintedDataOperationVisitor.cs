@@ -26,6 +26,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         {
             private readonly TaintedDataAnalysisDomain _taintedDataAnalysisDomain;
             private readonly Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>> _interfaceTargets = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>();
+            private Dictionary<ILocalSymbol, IOperation?>? _singleBufferAssignments;
 
             /// <summary>
             /// Mapping of a tainted data sinks to their originating sources.
@@ -1095,6 +1096,73 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 {
                     this.CurrentAnalysisData.SetAbstractValue(analysisEntity, value);
                 }
+
+                // Buffer views share storage. A read into a segment/memory/span also writes
+                // its backing buffer. Copies (ToArray, ToMemory, user methods) do not alias.
+                if (value.Kind == TaintedDataAbstractValueKind.Tainted)
+                {
+                    var storage = GetBufferViewStorage(operation, new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+                    if (storage != null && AnalysisEntityFactory.TryCreate(storage, out var storageEntity))
+                        this.CurrentAnalysisData.SetAbstractValue(storageEntity, value);
+                }
+            }
+
+            private IOperation? GetBufferViewStorage(IOperation operation, HashSet<ILocalSymbol> seen)
+            {
+                if (operation is IArgumentOperation argument)
+                    return GetBufferViewStorage(argument.Value, seen);
+                if (operation is IConversionOperation conversion)
+                    return GetBufferViewStorage(conversion.Operand, seen);
+
+                var type = operation.Type?.OriginalDefinition.ToDisplayString();
+                if (operation.Type is IArrayTypeSymbol)
+                    return operation is ILocalReferenceOperation arrayLocal && GetSingleBufferAssignment(arrayLocal.Local) == null
+                        ? null : operation;
+                if (type != "System.ArraySegment<T>" && type != "System.Memory<T>" && type != "System.Span<T>")
+                    return null;
+
+                if (operation is IObjectCreationOperation creation && creation.Arguments.Length > 0 &&
+                    creation.Arguments[0].Value.Type is IArrayTypeSymbol)
+                    return GetBufferViewStorage(creation.Arguments[0].Value, seen);
+                if (operation is IInvocationOperation invocation)
+                {
+                    var method = invocation.TargetMethod;
+                    if (method.ContainingType.ToDisplayString() == "System.MemoryExtensions" &&
+                        (method.Name == "AsMemory" || method.Name == "AsSpan") && invocation.Arguments.Length > 0)
+                        return GetBufferViewStorage(invocation.Arguments[0].Value, seen);
+                    if (method.Name == "Slice" && invocation.Instance != null)
+                        return GetBufferViewStorage(invocation.Instance, seen);
+                }
+                if (operation is ILocalReferenceOperation local && seen.Add(local.Local))
+                {
+                    // Only a single assignment is safe to resolve without a separate alias
+                    // lattice. Reassigned and conditional views remain deliberately unknown.
+                    var assigned = GetSingleBufferAssignment(local.Local);
+                    if (assigned != null)
+                        return GetBufferViewStorage(assigned, seen);
+                }
+                return null;
+            }
+
+            private IOperation? GetSingleBufferAssignment(ILocalSymbol local)
+            {
+                if (_singleBufferAssignments == null)
+                {
+                    _singleBufferAssignments = new Dictionary<ILocalSymbol, IOperation?>(SymbolEqualityComparer.Default);
+                    foreach (var operation in DataFlowAnalysisContext.ControlFlowGraph.Blocks
+                        .SelectMany(block => block.Operations.Concat(block.BranchValue == null
+                            ? Enumerable.Empty<IOperation>() : new[] { block.BranchValue }))
+                        .SelectMany(root => root.DescendantsAndSelf()))
+                    {
+                        if (operation is ISimpleAssignmentOperation write && write.Target is ILocalReferenceOperation target)
+                            _singleBufferAssignments[target.Local] = _singleBufferAssignments.ContainsKey(target.Local) ? null : write.Value;
+                        if (operation is IArgumentOperation argument &&
+                            (argument.Parameter?.RefKind == RefKind.Ref || argument.Parameter?.RefKind == RefKind.Out) &&
+                            argument.Value is ILocalReferenceOperation escaped)
+                            _singleBufferAssignments[escaped.Local] = null;
+                    }
+                }
+                return _singleBufferAssignments.TryGetValue(local, out var assigned) ? assigned : null;
             }
 
             protected override void ApplyInterproceduralAnalysisResultCore(TaintedDataAnalysisData resultData)

@@ -136,6 +136,10 @@
   },
   "TaintSources": [
     {
+      "Type": "Microsoft.AspNetCore.Http.WebSocketManager",
+      "Methods": [ "AcceptWebSocketAsync" ]
+    },
+    {
       "Type": "Grpc.Core.ServerCallContext",
       "Properties": [ "RequestHeaders" ]
     },
@@ -878,6 +882,14 @@
   ],
   "Transfers": [
     {
+      "Type": "System.Net.WebSockets.WebSocket",
+      "Methods": [ { "Name": "ReceiveAsync", "InOut": [ { ".This": "buffer" } ] } ]
+    },
+    {
+      "Type": "System.IO.Pipelines.PipeReader",
+      "Methods": [ { "Name": "TryRead", "InOut": [ { ".This": "result" } ] } ]
+    },
+    {
       "Type": "System.Uri",
       "Methods": [
         {
@@ -978,6 +990,10 @@
     {
       "Type": "System.IO.Stream",
       "Methods": [
+        { "Name": "ReadExactly", "InOut": [ { ".This": "buffer" } ] },
+        { "Name": "ReadExactlyAsync", "InOut": [ { ".This": "buffer" } ] },
+        { "Name": "ReadAtLeast", "InOut": [ { ".This": "buffer" } ] },
+        { "Name": "ReadAtLeastAsync", "InOut": [ { ".This": "buffer" } ] },
         {
           "Name": "BeginWrite",
           "InOut": [
