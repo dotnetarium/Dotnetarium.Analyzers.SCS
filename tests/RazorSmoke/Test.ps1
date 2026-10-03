@@ -39,6 +39,11 @@ foreach ($project in @($client, $server)) {
 
 $actual = @($diagnostics | Sort-Object -Unique)
 $expected = @(
+    'EventProbe.razor:4:DNA0003',
+    'EventProbe.razor:7:DNA0003',
+    'RawChild.razor:1:DNA0003',
+    'AutoEventProbe.razor:4:DNA0003',
+    'ServerEventProbe.razor:4:DNA0003',
     'ClientProbe.razor:3:DNA0003',
     'AutoProbe.razor:3:DNA0003',
     'AutoProbe.razor:4:DNA0003',

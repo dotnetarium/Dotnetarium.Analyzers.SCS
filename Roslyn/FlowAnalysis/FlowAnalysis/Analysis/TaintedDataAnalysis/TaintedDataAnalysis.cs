@@ -35,12 +35,13 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             TaintedDataSymbolMap<SinkInfo> taintedSinkInfos,
             CancellationToken cancellationToken,
             uint defaultMaxInterproceduralMethodCallChain,
-            uint defaultMaxInterproceduralLambdaOrLocalFunctionCallChain)
+            uint defaultMaxInterproceduralLambdaOrLocalFunctionCallChain,
+            bool cacheResult = true)
         {
             var interproceduralAnalysisConfig = InterproceduralAnalysisConfiguration.Create(
                 analyzerOptions, rule, cfg, compilation, InterproceduralAnalysisKind.ContextSensitive, cancellationToken, defaultMaxInterproceduralMethodCallChain, defaultMaxInterproceduralLambdaOrLocalFunctionCallChain);
             return TryGetOrComputeResult(cfg, compilation, containingMethod, analyzerOptions, taintedSourceInfos,
-                taintedSanitizerInfos, taintedSinkInfos, interproceduralAnalysisConfig);
+                taintedSanitizerInfos, taintedSinkInfos, interproceduralAnalysisConfig, cacheResult);
         }
 
         private static TaintedDataAnalysisResult? TryGetOrComputeResult(
@@ -51,7 +52,8 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             TaintedDataSymbolMap<SourceInfo> taintedSourceInfos,
             TaintedDataSymbolMap<SanitizerInfo> taintedSanitizerInfos,
             TaintedDataSymbolMap<SinkInfo> taintedSinkInfos,
-            InterproceduralAnalysisConfiguration interproceduralAnalysisConfig)
+            InterproceduralAnalysisConfiguration interproceduralAnalysisConfig,
+            bool cacheResult)
         {
             if (cfg == null)
             {
@@ -115,15 +117,18 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 taintedSanitizerInfos: taintedSanitizerInfos,
                 taintedSinkInfos: taintedSinkInfos);
 
-            return TryGetOrComputeResultForAnalysisContext(analysisContext);
+            return ComputeResultForAnalysisContext(analysisContext, cacheResult);
         }
 
         private static TaintedDataAnalysisResult? TryGetOrComputeResultForAnalysisContext(TaintedDataAnalysisContext analysisContext)
+            => ComputeResultForAnalysisContext(analysisContext, cacheResult: true);
+
+        private static TaintedDataAnalysisResult? ComputeResultForAnalysisContext(TaintedDataAnalysisContext analysisContext, bool cacheResult)
         {
             TaintedDataAnalysisDomain analysisDomain = new TaintedDataAnalysisDomain(new CoreTaintedDataAnalysisDataDomain(analysisContext.PointsToAnalysisResult));
             TaintedDataOperationVisitor visitor = new TaintedDataOperationVisitor(analysisDomain, analysisContext);
             TaintedDataAnalysis analysis = new TaintedDataAnalysis(analysisDomain, visitor);
-            return analysis.TryGetOrComputeResultCore(analysisContext, cacheResult: true);
+            return analysis.TryGetOrComputeResultCore(analysisContext, cacheResult);
         }
 
         protected override TaintedDataAnalysisResult ToResult(

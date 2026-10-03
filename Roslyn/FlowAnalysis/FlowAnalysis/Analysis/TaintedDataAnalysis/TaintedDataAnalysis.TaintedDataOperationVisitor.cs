@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the MIT license.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the MIT license.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -26,7 +26,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         {
             private readonly TaintedDataAnalysisDomain _taintedDataAnalysisDomain;
             private readonly Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>> _interfaceTargets = new Dictionary<IMethodSymbol, ImmutableArray<IMethodSymbol>>();
-            private Dictionary<ILocalSymbol, IOperation?>? _singleBufferAssignments;
+            private BufferAliasAnalysis? _bufferAliases;
 
             /// <summary>
             /// Mapping of a tainted data sinks to their originating sources.
@@ -329,14 +329,24 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 if (operation is IPropertyReferenceOperation propertyReferenceOperation
                     && this.DataFlowAnalysisContext.SourceInfos.IsSourceProperty(propertyReferenceOperation))
                 {
-                    return TaintedDataAbstractValue.CreateTainted(propertyReferenceOperation.Member, propertyReferenceOperation.Syntax, this.OwningSymbol);
+                    return this.DataFlowAnalysisContext.SourceInfos.GetModeledPropertyValue(propertyReferenceOperation) ??
+                        TaintedDataAbstractValue.CreateTainted(propertyReferenceOperation.Member, propertyReferenceOperation.Syntax, this.OwningSymbol);
                 }
                 else if (operation is IFieldReferenceOperation fieldReferenceOperation
-                    && this.DataFlowAnalysisContext.SourceInfos.IsSourceField(fieldReferenceOperation.Field))
+                    && this.DataFlowAnalysisContext.SourceInfos.IsSourceField(fieldReferenceOperation))
                 {
-                    return TaintedDataAbstractValue.CreateTainted(fieldReferenceOperation.Member, fieldReferenceOperation.Syntax, this.OwningSymbol);
+                    return this.DataFlowAnalysisContext.SourceInfos.GetModeledFieldValue(fieldReferenceOperation) ??
+                        TaintedDataAbstractValue.CreateTainted(fieldReferenceOperation.Member, fieldReferenceOperation.Syntax, this.OwningSymbol);
                 }
 
+                if (operation.Type is IArrayTypeSymbol)
+                {
+                    var storageValues = GetPointsToAbstractValue(operation).Locations
+                        .Where(location => location.LocationType is IArrayTypeSymbol)
+                        .Select(location => GetAbstractValue(BufferStorageEntity(location)))
+                        .Where(value => value.Kind == TaintedDataAbstractValueKind.Tainted).ToArray();
+                    if (storageValues.Length > 0) return TaintedDataAbstractValue.MergeTainted(storageValues);
+                }
                 if (AnalysisEntityFactory.TryCreate(operation, out AnalysisEntity? analysisEntity))
                 {
                     return this.CurrentAnalysisData.TryGetValue(analysisEntity, out TaintedDataAbstractValue? value) ? value : defaultValue;
@@ -836,6 +846,11 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 IEnumerable<IArgumentOperation> taintedArguments,
                 IOperation originalOperation)
             {
+                if (originalOperation is IInvocationOperation { Instance: { } receiver } && targetMethod.ContainingType != null &&
+                    GetCachedAbstractValue(receiver) is { Kind: TaintedDataAbstractValueKind.Tainted } receiverValue)
+                    foreach (var sink in DataFlowAnalysisContext.SinkInfos.GetInfosForType(targetMethod.ContainingType))
+                        if (sink.SinkMethodParameters.TryGetValue(targetMethod.Name, out var parameters) && parameters.Contains(TaintedTargetValue.This))
+                            TrackTaintedDataEnteringSink(targetMethod, originalOperation.Syntax.GetLocation(), sink.SinkKinds, receiverValue.SourceOrigins);
                 if (targetMethod.ContainingType != null && taintedArguments.Any())
                 {
                     IEnumerable<SinkInfo>? infosForType = this.DataFlowAnalysisContext.SinkInfos.GetInfosForType(targetMethod.ContainingType);
@@ -1101,73 +1116,15 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 // its backing buffer. Copies (ToArray, ToMemory, user methods) do not alias.
                 if (value.Kind == TaintedDataAbstractValueKind.Tainted)
                 {
-                    var storage = GetBufferViewStorage(operation, new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
-                    if (storage != null && AnalysisEntityFactory.TryCreate(storage, out var storageEntity))
-                        this.CurrentAnalysisData.SetAbstractValue(storageEntity, value);
+                    _bufferAliases ??= new BufferAliasAnalysis(DataFlowAnalysisContext.ControlFlowGraph, DataFlowAnalysisContext.PointsToAnalysisResult);
+                    foreach (var storage in _bufferAliases.GetStorage(operation).Where(location => location.LocationType is IArrayTypeSymbol))
+                        this.CurrentAnalysisData.SetAbstractValue(BufferStorageEntity(storage), value);
                 }
             }
 
-            private IOperation? GetBufferViewStorage(IOperation operation, HashSet<ILocalSymbol> seen)
-            {
-                if (operation is IArgumentOperation argument)
-                    return GetBufferViewStorage(argument.Value, seen);
-                if (operation is IConversionOperation conversion)
-                    return GetBufferViewStorage(conversion.Operand, seen);
-
-                var type = operation.Type?.OriginalDefinition.ToDisplayString();
-                if (operation.Type is IArrayTypeSymbol)
-                    return operation is ILocalReferenceOperation arrayLocal && GetSingleBufferAssignment(arrayLocal.Local) == null
-                        ? null : operation;
-                if (type != "System.ArraySegment<T>" && type != "System.Memory<T>" && type != "System.Span<T>")
-                    return null;
-
-                if (operation is IObjectCreationOperation creation && creation.Arguments.Length > 0 &&
-                    creation.Arguments[0].Value.Type is IArrayTypeSymbol)
-                    return GetBufferViewStorage(creation.Arguments[0].Value, seen);
-                if (operation is IInvocationOperation invocation)
-                {
-                    var method = invocation.TargetMethod;
-                    if (method.ContainingType.ToDisplayString() == "System.MemoryExtensions" &&
-                        (method.Name == "AsMemory" || method.Name == "AsSpan") && invocation.Arguments.Length > 0)
-                        return GetBufferViewStorage(invocation.Arguments[0].Value, seen);
-                    if (method.Name == "Slice" && invocation.Instance != null)
-                        return GetBufferViewStorage(invocation.Instance, seen);
-                }
-                if (operation is IPropertyReferenceOperation property && property.Instance != null &&
-                    property.Property.Name == "Span" &&
-                    property.Property.ContainingType.OriginalDefinition.ToDisplayString() == "System.Memory<T>")
-                    return GetBufferViewStorage(property.Instance, seen);
-                if (operation is ILocalReferenceOperation local && seen.Add(local.Local))
-                {
-                    // Only a single assignment is safe to resolve without a separate alias
-                    // lattice. Reassigned and conditional views remain deliberately unknown.
-                    var assigned = GetSingleBufferAssignment(local.Local);
-                    if (assigned != null)
-                        return GetBufferViewStorage(assigned, seen);
-                }
-                return null;
-            }
-
-            private IOperation? GetSingleBufferAssignment(ILocalSymbol local)
-            {
-                if (_singleBufferAssignments == null)
-                {
-                    _singleBufferAssignments = new Dictionary<ILocalSymbol, IOperation?>(SymbolEqualityComparer.Default);
-                    foreach (var operation in DataFlowAnalysisContext.ControlFlowGraph.Blocks
-                        .SelectMany(block => block.Operations.Concat(block.BranchValue == null
-                            ? Enumerable.Empty<IOperation>() : new[] { block.BranchValue }))
-                        .SelectMany(root => root.DescendantsAndSelf()))
-                    {
-                        if (operation is ISimpleAssignmentOperation write && write.Target is ILocalReferenceOperation target)
-                            _singleBufferAssignments[target.Local] = _singleBufferAssignments.ContainsKey(target.Local) ? null : write.Value;
-                        if (operation is IArgumentOperation argument &&
-                            (argument.Parameter?.RefKind == RefKind.Ref || argument.Parameter?.RefKind == RefKind.Out) &&
-                            argument.Value is ILocalReferenceOperation escaped)
-                            _singleBufferAssignments[escaped.Local] = null;
-                    }
-                }
-                return _singleBufferAssignments.TryGetValue(local, out var assigned) ? assigned : null;
-            }
+            private static AnalysisEntity BufferStorageEntity(AbstractLocation location) =>
+                AnalysisEntity.Create(location.LocationType, ImmutableArray<AbstractIndex>.Empty, location.LocationType!,
+                    PointsToAbstractValue.Create(location, mayBeNull: false), parent: null, entityForInstanceLocation: null);
 
             protected override void ApplyInterproceduralAnalysisResultCore(TaintedDataAnalysisData resultData)
                 => ApplyInterproceduralAnalysisResultHelper(resultData.CoreAnalysisData);

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
+using Dotnetarium.Analyzers.Taint;
 using Dotnetarium.Config;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -17,7 +18,8 @@ public sealed class ConfigurationTests
         Assert.DoesNotContain(config.Sinks, sink => sink.Type.StartsWith("System.Web.", StringComparison.Ordinal));
         Assert.DoesNotContain(config.TaintSources, source => source.Type.StartsWith("System.Web.", StringComparison.Ordinal));
         Assert.DoesNotContain(config.TaintSources, source => source.Type == "Microsoft.EntityFrameworkCore.DbContext");
-        Assert.DoesNotContain(config.Sinks, sink => sink.Type == "System.Xml.XmlReader");
+        var xml = Assert.Single(config.Sinks, sink => sink.Type == "System.Xml.XmlReader");
+        Assert.Equal([TaintType.XmlExternalEntity], xml.TaintTypes);
         var context = Assert.Single(config.TaintSources, source => source.Type == "Microsoft.AspNetCore.Http.HttpContext");
         Assert.Equal(["Request"], context.Properties);
     }

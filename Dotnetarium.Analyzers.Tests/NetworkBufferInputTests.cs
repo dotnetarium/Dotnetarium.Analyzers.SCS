@@ -24,6 +24,10 @@ public sealed class NetworkBufferInputTests
     [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var first = new byte[128]; var second = new byte[128]; var view = first.AsMemory(); view = second.AsMemory(); await socket.ReceiveAsync(view, default); Process.Start(Encoding.UTF8.GetString(first));", 0)]
     [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var bytes = new byte[128]; var memory = bytes.AsMemory(); bytes = new byte[128]; await socket.ReceiveAsync(memory, default); Process.Start(Encoding.UTF8.GetString(bytes));", 0)]
     [InlineData("var bytes = new byte[128]; var memory = bytes.AsMemory(); context.Request.Body.ReadExactly(memory.Span); Process.Start(Encoding.UTF8.GetString(bytes));", 1)]
+    [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var first = new byte[128]; var second = new byte[128]; var view = first.AsMemory(); view = second.AsMemory(); await socket.ReceiveAsync(view, default); Process.Start(Encoding.UTF8.GetString(second));", 1)]
+    [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var first = new byte[128]; var second = new byte[128]; var view = first.AsMemory(); if (enabled) view = second.AsMemory(); await socket.ReceiveAsync(view, default); Process.Start(Encoding.UTF8.GetString(first)); Process.Start(Encoding.UTF8.GetString(second));", 2)]
+    [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var bytes = new byte[128]; var alias = bytes; await socket.ReceiveAsync(alias.AsMemory(), default); Process.Start(Encoding.UTF8.GetString(bytes));", 1)]
+    [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var bytes = new byte[128]; await socket.ReceiveAsync(bytes.AsMemory(), default); bytes = new byte[128]; Process.Start(Encoding.UTF8.GetString(bytes));", 0)]
     public async Task Received_buffers_flow_but_local_buffers_do_not(string body, int expected)
     {
         var source = """
@@ -39,7 +43,7 @@ public sealed class NetworkBufferInputTests
             using Microsoft.AspNetCore.Http;
             public static class Handler
             {
-                public static async Task Run(HttpContext context)
+                public static async Task Run(HttpContext context, bool enabled)
                 {
             """ + body + "}}";
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)

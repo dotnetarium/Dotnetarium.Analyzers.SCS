@@ -25,15 +25,15 @@ namespace Dotnetarium.Config
             Cache.GetOrCreateValue(context, current =>
                 new Configuration(
                     ConfigurationManager.GetProjectConfiguration(current.Options.AdditionalFiles),
-                    current.Compilation));
+                    current.Compilation, current.Options));
 
-        private Configuration(ConfigData data, Compilation compilation)
+        private Configuration(ConfigData data, Compilation compilation, AnalyzerOptions options)
         {
             MaxInterproceduralMethodCallChain = data.MaxInterproceduralMethodCallChain ?? 5;
             MaxInterproceduralLambdaOrLocalFunctionCallChain =
                 data.MaxInterproceduralLambdaOrLocalFunctionCallChain ?? 5;
             TaintFlowVisualizationEnabled = data.TaintFlowVisualizationEnabled ?? true;
-            TaintConfiguration = new TaintConfiguration(data, compilation);
+            TaintConfiguration = new TaintConfiguration(data, compilation, options);
         }
 
         public uint MaxInterproceduralMethodCallChain { get; }
@@ -48,17 +48,25 @@ namespace Dotnetarium.Config
         private readonly Compilation compilation;
         private readonly Lazy<ImmutableDictionary<IMethodSymbol, bool>> minimalApiHandlers;
         private readonly Lazy<SignalRInputModel> signalRInputs;
+        private readonly Lazy<MessageInputModel> messageInputs;
+        private readonly BinderInputModel binderInputs;
+        private readonly Lazy<EndpointFilterInputModel> endpointFilters;
+        private readonly Lazy<ComponentStateInputModel> componentInputs;
         private readonly WellKnownTypeProvider types;
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SourceInfo>> sourceMaps = new();
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SanitizerInfo>> sanitizerMaps = new();
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SinkInfo>> sinkMaps = new();
 
-        public TaintConfiguration(ConfigData model, Compilation compilation)
+        public TaintConfiguration(ConfigData model, Compilation compilation, AnalyzerOptions options)
         {
             this.model = model;
             this.compilation = compilation;
             minimalApiHandlers = new Lazy<ImmutableDictionary<IMethodSymbol, bool>>(FindMinimalApiHandlers);
             signalRInputs = new Lazy<SignalRInputModel>(() => new SignalRInputModel(compilation));
+            messageInputs = new Lazy<MessageInputModel>(() => new MessageInputModel(compilation));
+            binderInputs = new BinderInputModel(compilation, options, this);
+            endpointFilters = new Lazy<EndpointFilterInputModel>(() => new EndpointFilterInputModel(compilation));
+            componentInputs = new Lazy<ComponentStateInputModel>(() => new ComponentStateInputModel(compilation, options, this));
             types = WellKnownTypeProvider.GetOrCreate(compilation);
         }
 
@@ -116,6 +124,10 @@ namespace Dotnetarium.Config
                         ((methodName, _) => methodName == name,
                          ImmutableHashSet<string>.Empty.Add(TaintedTargetValue.Return)))
                     .ToImmutableHashSet();
+                if (type == "Microsoft.AspNetCore.Http.EndpointFilterInvocationContext")
+                    methods = methods.Add(((name, arguments) => name == "GetArgument" && arguments.Length == 1 &&
+                        endpointFilters.Value.GetBoundParameters(arguments[0].Parent).Any(parameter => IsMinimalApiInputParameter(parameter, compilation)),
+                        ImmutableHashSet<string>.Empty.Add(TaintedTargetValue.Return)));
                 var transfers = definition.Transfers
                     .Where(method => method.InOut != null)
                     .Select(method =>
@@ -147,7 +159,8 @@ namespace Dotnetarium.Config
                 var parameters = entries.Count == 0
                     ? ImmutableHashSet<ParameterMatcher>.Empty
                     : ImmutableHashSet.Create<ParameterMatcher>((parameter, provider) =>
-                        entries.Any(entry => IsInputParameter(parameter, provider, entry)));
+                        entries.Any(entry => (entry.Parameter?.Binding != "Blazor" || kind == (SinkKind)(int)TaintType.CrossSiteScripting) &&
+                            IsInputParameter(parameter, provider, entry)));
 
                 compiled.Add(new SourceInfo(
                     type,
@@ -171,9 +184,15 @@ namespace Dotnetarium.Config
                     taintRoutedParameters: source?.RoutedParameters ?? false,
                     serverBoundPropertyAttributes: (source?.ServerPropertyAttributes ?? Array.Empty<string>())
                         .ToImmutableHashSet(StringComparer.Ordinal),
-                    propertyReferenceMatcher: type == "System.Object"
-                        ? IsMixedAggregateRequestProperty
-                        : null));
+                    propertyReferenceMatcher: property =>
+                        (type == "System.Object" && IsMixedAggregateRequestProperty(property)) ||
+                        endpointFilters.Value.GetBoundParameters(property).Any(parameter => IsMinimalApiInputParameter(parameter, compilation)) ||
+                        messageInputs.Value.IsPropertyInput(property),
+                    fieldReferenceMatcher: field => messageInputs.Value.IsFieldInput(field),
+                    propertyValueProvider: property => GetBinderPropertyValue(property, kind) ??
+                        (kind == (SinkKind)(int)TaintType.CrossSiteScripting ? componentInputs.Value.GetPropertyInput(property) : null),
+                    fieldValueProvider: field => GetBinderMemberValue(field.Field, field.Instance, kind) ??
+                        (kind == (SinkKind)(int)TaintType.CrossSiteScripting ? componentInputs.Value.GetFieldInput(field) : null)));
             }
 
             return compiled.ToImmutable();
@@ -279,6 +298,8 @@ namespace Dotnetarium.Config
             {
                 "SignalR" => signalRInputs.Value.IsInput(parameter),
                 "AzureFunctions" => IsAzureFunctionInput(parameter, method),
+                "Messaging" => messageInputs.Value.IsParameterInput(parameter),
+                "Blazor" => componentInputs.Value.IsParameterInput(parameter),
                 _ => true
             };
         }
@@ -288,6 +309,10 @@ namespace Dotnetarium.Config
             const string function = "Microsoft.Azure.Functions.Worker.FunctionAttribute";
             const string http = "Microsoft.Azure.Functions.Worker.HttpTriggerAttribute";
             const string serviceBus = "Microsoft.Azure.Functions.Worker.ServiceBusTriggerAttribute";
+            var payloadTriggers = new[] { http, serviceBus,
+                "Microsoft.Azure.Functions.Worker.QueueTriggerAttribute",
+                "Microsoft.Azure.Functions.Worker.EventGridTriggerAttribute",
+                "Microsoft.Azure.Functions.Worker.EventHubTriggerAttribute" };
             if (method.MethodKind != MethodKind.Ordinary || method.DeclaredAccessibility != Accessibility.Public ||
                 !HasAttribute(method, function) || parameter.RefKind != RefKind.None)
                 return false;
@@ -298,7 +323,7 @@ namespace Dotnetarium.Config
             if (type == "Microsoft.Azure.Functions.Worker.Http.HttpRequestData" ||
                 type == "Microsoft.AspNetCore.Http.HttpRequest")
                 return false;
-            if (HasAttribute(parameter, http) || HasAttribute(parameter, serviceBus))
+            if (payloadTriggers.Any(trigger => HasAttribute(parameter, trigger)))
                 return true;
             return HasAttribute(parameter, "Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute") &&
                 method.Parameters.Any(candidate => HasAttribute(candidate, http));
@@ -409,6 +434,20 @@ namespace Dotnetarium.Config
                 return false;
 
             return IsRequestBoundMember(aggregate, property.Property);
+        }
+
+        private TaintedDataAbstractValue? GetBinderPropertyValue(IPropertyReferenceOperation property, SinkKind kind) =>
+            GetBinderMemberValue(property.Property, property.Instance, kind);
+
+        private TaintedDataAbstractValue? GetBinderMemberValue(ISymbol member, IOperation? instance, SinkKind kind)
+        {
+            var direct = MessageInputModel.StableParameter(instance, compilation);
+            var parameters = direct != null ? new[] { direct } : endpointFilters.Value.GetBoundParameters(instance);
+            var values = parameters.Where(parameter => !HasServiceBindingAttribute(parameter) && IsMinimalApiHandlerParameter(parameter) &&
+                    parameter.Type is INamedTypeSymbol bound && HasCustomRequestBinder(bound))
+                .Select(parameter => binderInputs.GetMemberInput((INamedTypeSymbol)parameter.Type, member, kind))
+                .Where(value => value != null).ToArray();
+            return values.Length == 0 ? null : TaintedDataAbstractValue.MergeTainted(values!);
         }
 
         private static bool IsRequestOnlyAggregate(ITypeSymbol type)

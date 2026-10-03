@@ -105,6 +105,14 @@
       "Method": { "Accessibility": [ "public" ], "IncludeConstructor": false },
       "Parameter": { "Binding": "AzureFunctions" }
     },
+    "Messaging": {
+      "SourceType": "System.Object",
+      "Parameter": { "Binding": "Messaging" }
+    },
+    "BlazorEvent": {
+      "SourceType": "System.Object",
+      "Parameter": { "Binding": "Blazor" }
+    },
     "SignalRHub": {
       "SourceType": "System.Object",
       "Dependency": [ "Microsoft.AspNetCore.SignalR.Hub" ],
@@ -141,6 +149,12 @@
     }
   },
   "TaintSources": [
+    { "Type": "Microsoft.AspNetCore.Http.EndpointFilterInvocationContext", "Properties": [] },
+    { "Type": "System.Collections.Generic.IList`1", "IsInterface": true, "Properties": [] },
+    { "Type": "MassTransit.ConsumeContext`1", "IsInterface": true, "Properties": [] },
+    { "Type": "MassTransit.MessageContext", "IsInterface": true, "Properties": [] },
+    { "Type": "RabbitMQ.Client.IChannel", "IsInterface": true, "Methods": [ "BasicGetAsync" ] },
+    { "Type": "Confluent.Kafka.IConsumer`2", "IsInterface": true, "Methods": [ "Consume" ] },
     {
       "Type": "Microsoft.Azure.Functions.Worker.Http.HttpRequestData",
       "Properties": [ "Body", "Headers", "Cookies", "Url", "Query" ]
@@ -1076,6 +1090,18 @@
     }
   ],
   "Sinks": [
+    {
+      "Type": "System.Xml.XmlReader", "TaintTypes": [ "XmlExternalEntity" ],
+      "Methods": [ { "Name": "Create", "Arguments": [ "input" ] } ]
+    },
+    {
+      "Type": "System.Xml.XmlDocument", "TaintTypes": [ "XmlExternalEntity" ],
+      "Methods": [ { "Name": "LoadXml", "Arguments": [ "xml" ] }, { "Name": "Load", "Arguments": [ "inStream", "txtReader" ] } ]
+    },
+    {
+      "Type": "System.Xml.XmlTextReader", "TaintTypes": [ "XmlExternalEntity" ],
+      "Methods": [ { "Name": "Read", "Arguments": [ ".This" ] } ]
+    },
     {
       "Type": "System.Net.NetworkCredential",
       "TaintTypes": [

@@ -14,6 +14,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
     internal delegate bool MethodMatcher(string methodName, ImmutableArray<IArgumentOperation> arguments);
     internal delegate bool ParameterMatcher(IParameterSymbol parameter, WellKnownTypeProvider wellKnownTypeProvider);
     internal delegate bool PropertyReferenceMatcher(IPropertyReferenceOperation property);
+    internal delegate bool FieldReferenceMatcher(IFieldReferenceOperation field);
+    internal delegate TaintedDataAbstractValue? PropertyValueProvider(IPropertyReferenceOperation property);
+    internal delegate TaintedDataAbstractValue? FieldValueProvider(IFieldReferenceOperation field);
     internal delegate bool ArrayLengthMatcher(int length);
 
     /// <summary>
@@ -52,7 +55,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             bool preserveTaintOnConversion = false,
             bool taintRoutedParameters = false,
             ImmutableHashSet<string>? serverBoundPropertyAttributes = null,
-            PropertyReferenceMatcher? propertyReferenceMatcher = null)
+            PropertyReferenceMatcher? propertyReferenceMatcher = null,
+            FieldReferenceMatcher? fieldReferenceMatcher = null,
+            PropertyValueProvider? propertyValueProvider = null,
+            FieldValueProvider? fieldValueProvider = null)
         {
             FullTypeName = fullTypeName ?? throw new ArgumentNullException(nameof(fullTypeName));
             IsInterface = isInterface;
@@ -62,6 +68,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             TaintRoutedParameters = taintRoutedParameters;
             ServerBoundPropertyAttributes = serverBoundPropertyAttributes ?? ImmutableHashSet<string>.Empty;
             PropertyReferenceMatcher = propertyReferenceMatcher;
+            FieldReferenceMatcher = fieldReferenceMatcher;
+            PropertyValueProvider = propertyValueProvider;
+            FieldValueProvider = fieldValueProvider;
             TaintedArguments = taintedArguments ?? throw new ArgumentNullException(nameof(taintedArguments));
             TaintedMethods = taintedMethods ?? throw new ArgumentNullException(nameof(taintedMethods));
             TaintedMethodsNeedsPointsToAnalysis = taintedMethodsNeedsPointsToAnalysis ?? throw new ArgumentNullException(nameof(taintedMethodsNeedsPointsToAnalysis));
@@ -153,6 +162,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
         /// <summary>Matches input properties whose source depends on the accessed instance.</summary>
         public PropertyReferenceMatcher? PropertyReferenceMatcher { get; }
+        public FieldReferenceMatcher? FieldReferenceMatcher { get; }
+        public PropertyValueProvider? PropertyValueProvider { get; }
+        public FieldValueProvider? FieldValueProvider { get; }
 
         /// <summary>
         /// Methods that generate tainted data.
@@ -250,7 +262,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         /// </summary>
         public bool RequiresParameterReferenceAnalysis => !this.TaintedArguments.IsEmpty;
 
-        public bool RequiresFieldReferenceAnalysis => this.AllFieldsAreTainted;
+        public bool RequiresFieldReferenceAnalysis => this.AllFieldsAreTainted || FieldReferenceMatcher != null || FieldValueProvider != null;
 
         public override int GetHashCode()
         {
@@ -267,6 +279,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
             hashCode.Add(this.TaintRoutedParameters.GetHashCode());
             HashUtilities.Combine(this.ServerBoundPropertyAttributes, ref hashCode);
             hashCode.Add(this.PropertyReferenceMatcher?.GetHashCode());
+            hashCode.Add(this.FieldReferenceMatcher?.GetHashCode());
+            hashCode.Add(this.PropertyValueProvider?.GetHashCode());
+            hashCode.Add(this.FieldValueProvider?.GetHashCode());
             HashUtilities.Combine(this.TaintedMethods, ref hashCode);
             HashUtilities.Combine(this.TaintedArguments, ref hashCode);
             HashUtilities.Combine(this.TaintedMethodsNeedsPointsToAnalysis, ref hashCode);
@@ -297,6 +312,9 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 && this.TaintRoutedParameters == other.TaintRoutedParameters
                 && this.ServerBoundPropertyAttributes == other.ServerBoundPropertyAttributes
                 && this.PropertyReferenceMatcher == other.PropertyReferenceMatcher
+                && this.FieldReferenceMatcher == other.FieldReferenceMatcher
+                && this.PropertyValueProvider == other.PropertyValueProvider
+                && this.FieldValueProvider == other.FieldValueProvider
                 && this.TaintedMethods == other.TaintedMethods
                 && this.TaintedArguments == other.TaintedArguments
                 && this.TaintedMethodsNeedsPointsToAnalysis == other.TaintedMethodsNeedsPointsToAnalysis
