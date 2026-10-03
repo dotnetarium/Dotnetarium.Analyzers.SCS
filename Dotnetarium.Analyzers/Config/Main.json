@@ -99,6 +99,12 @@
       },
       "Parameter": { "Names": [ "request", "requestStream" ] }
     },
+    "AzureFunction": {
+      "SourceType": "System.Object",
+      "Dependency": [ "Microsoft.Azure.Functions.Worker.FunctionAttribute" ],
+      "Method": { "Accessibility": [ "public" ], "IncludeConstructor": false },
+      "Parameter": { "Binding": "AzureFunctions" }
+    },
     "SignalRHub": {
       "SourceType": "System.Object",
       "Dependency": [ "Microsoft.AspNetCore.SignalR.Hub" ],
@@ -135,6 +141,14 @@
     }
   },
   "TaintSources": [
+    {
+      "Type": "Microsoft.Azure.Functions.Worker.Http.HttpRequestData",
+      "Properties": [ "Body", "Headers", "Cookies", "Url", "Query" ]
+    },
+    {
+      "Type": "Microsoft.Azure.Functions.Worker.Http.HttpRequestDataExtensions",
+      "Methods": [ "ReadAsString", "ReadAsStringAsync", "ReadFromJsonAsync" ]
+    },
     {
       "Type": "Microsoft.AspNetCore.Http.WebSocketManager",
       "Methods": [ "AcceptWebSocketAsync" ]

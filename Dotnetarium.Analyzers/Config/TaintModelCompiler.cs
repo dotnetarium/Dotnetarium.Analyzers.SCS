@@ -275,7 +275,33 @@ namespace Dotnetarium.Config
 
             if (HasAnyParameterAttribute(parameter, provider, entry.Parameter?.Attributes?.Exclude))
                 return false;
-            return entry.Parameter?.Binding != "SignalR" || signalRInputs.Value.IsInput(parameter);
+            return entry.Parameter?.Binding switch
+            {
+                "SignalR" => signalRInputs.Value.IsInput(parameter),
+                "AzureFunctions" => IsAzureFunctionInput(parameter, method),
+                _ => true
+            };
+        }
+
+        private static bool IsAzureFunctionInput(IParameterSymbol parameter, IMethodSymbol method)
+        {
+            const string function = "Microsoft.Azure.Functions.Worker.FunctionAttribute";
+            const string http = "Microsoft.Azure.Functions.Worker.HttpTriggerAttribute";
+            const string serviceBus = "Microsoft.Azure.Functions.Worker.ServiceBusTriggerAttribute";
+            if (method.MethodKind != MethodKind.Ordinary || method.DeclaredAccessibility != Accessibility.Public ||
+                !HasAttribute(method, function) || parameter.RefKind != RefKind.None)
+                return false;
+
+            // Request wrappers expose only their input properties through the source model;
+            // the context and response factory must not become sources with the wrapper.
+            var type = parameter.Type.ToDisplayString();
+            if (type == "Microsoft.Azure.Functions.Worker.Http.HttpRequestData" ||
+                type == "Microsoft.AspNetCore.Http.HttpRequest")
+                return false;
+            if (HasAttribute(parameter, http) || HasAttribute(parameter, serviceBus))
+                return true;
+            return HasAttribute(parameter, "Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute") &&
+                method.Parameters.Any(candidate => HasAttribute(candidate, http));
         }
 
         private bool IsMinimalApiInputParameter(IParameterSymbol parameter, Compilation compilation)

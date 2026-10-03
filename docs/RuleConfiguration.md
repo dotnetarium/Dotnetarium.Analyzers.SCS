@@ -53,3 +53,11 @@ SignalR hub methods and client upload streams are also entry points. Their bindi
 Accepted ASP.NET Core WebSockets are request sources. `ReceiveAsync` transfers taint into its `buffer`; `SendAsync` does not. Standard `ArraySegment<T>`, `Memory<T>` and `Span<T>` views transfer writes to their backing array, including slices and locals assigned once. Reassigned views and custom buffer wrappers are not resolved to backing storage. Client-created WebSockets are not assumed to be request sources.
 
 `PipeReader` preserves taint from the request body or an explicit Minimal API pipe parameter through `ReadAsync`, `ReadAtLeastAsync`, and `TryRead(out result)`. Local pipes remain untainted. Stream `ReadExactly[Async]` and `ReadAtLeast[Async]` transfer incoming data into caller buffers.
+
+### Azure Functions isolated worker
+
+Public `[Microsoft.Azure.Functions.Worker.Function]` methods are recognized as entry points. Parameters carrying the isolated worker's `[HttpTrigger]` or `[ServiceBusTrigger]` are sources, including POCOs, message bodies and batches. An isolated `[FromBody]` parameter is a source only when the same function has an HTTP trigger. The request wrapper exposes `Body`, `Headers`, `Cookies`, `Url`, `Query`, and the SDK body-reading extensions; its function context and response factory remain outside the source model. ASP.NET Core-integrated `HttpRequest` uses the existing request model.
+
+Unannotated parameters, constructor services, `FunctionContext`, and `ServiceBusMessageActions` are not sources. Creating a `ServiceBusReceivedMessage` locally does not make it a source. HTTP route parameters without a binding attribute, other Azure trigger families, and the old in-process/WebJobs model are not covered by this entry-point model.
+
+The models are checked against the real .NET 8/10 framework and isolated-worker SDK assemblies. See the official [HTTP trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-http-webhook-trigger) and [Service Bus trigger](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-service-bus-trigger) binding references.
