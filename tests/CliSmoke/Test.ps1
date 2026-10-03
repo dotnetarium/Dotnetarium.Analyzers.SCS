@@ -321,7 +321,7 @@ $testOptInOutput = & $tool $project
 if ($LASTEXITCODE -ne 0 -or ([regex]::Matches(($testOptInOutput -join "`n"), 'DNA0020')).Count -ne 4) {
     throw 'Test-project certificate opt-in did not restore CLI findings.'
 }
-Remove-Item -LiteralPath $globalConfig
+Remove-Item -LiteralPath $globalConfig -Force
 
 # The tool must also read evaluated metadata without our NuGet props present.
 $testProjectXml.Replace("<PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" />", '') |
