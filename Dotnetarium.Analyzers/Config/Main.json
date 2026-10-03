@@ -60,6 +60,45 @@
         }
       }
     },
+    "GrpcService": {
+      "SourceType": "System.Object",
+      "Dependency": [
+        "Grpc.Core.BindServiceMethodAttribute",
+        "Google.Protobuf.IMessage"
+      ],
+      "Class": {
+        "Attributes": {
+          "Required": [
+            { "Type": "Grpc.Core.BindServiceMethodAttribute" }
+          ]
+        }
+      },
+      "Method": {
+        "IsOverride": true,
+        "OverriddenTypeAttributes": [
+          { "Type": "Grpc.Core.BindServiceMethodAttribute" }
+        ],
+        "IncludeConstructor": false,
+        "Static": false
+      },
+      "Parameter": {
+        "Types": [
+          "Google.Protobuf.IMessage",
+          "Grpc.Core.IAsyncStreamReader`1"
+        ]
+      }
+    },
+    "GrpcServerInterceptor": {
+      "SourceType": "System.Object",
+      "Dependency": [ "Grpc.Core.Interceptors.Interceptor" ],
+      "Class": { "Parent": "Grpc.Core.Interceptors.Interceptor" },
+      "Method": {
+        "Name": "/^(UnaryServerHandler|ClientStreamingServerHandler|ServerStreamingServerHandler|DuplexStreamingServerHandler)$/",
+        "IsOverride": true,
+        "OverriddenTypes": [ "Grpc.Core.Interceptors.Interceptor" ]
+      },
+      "Parameter": { "Names": [ "request", "requestStream" ] }
+    },
     "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
       "Class": {
         "Accessibility": [
@@ -85,6 +124,10 @@
     }
   },
   "TaintSources": [
+    {
+      "Type": "Grpc.Core.ServerCallContext",
+      "Properties": [ "RequestHeaders" ]
+    },
     {
       "Type": "Microsoft.AspNetCore.Mvc.RazorPages.PageModel",
       "PropertyAttributes": [
@@ -2182,6 +2225,11 @@
           ]
         }
       ]
+    },
+    {
+      "Type": "Grpc.Net.Client.GrpcChannel",
+      "TaintTypes": [ "ServerSideRequestForgery" ],
+      "Methods": [ { "Name": "ForAddress", "Arguments": [ "address" ] } ]
     },
     {
       "Type": "System.Net.Http.HttpRequestMessage",

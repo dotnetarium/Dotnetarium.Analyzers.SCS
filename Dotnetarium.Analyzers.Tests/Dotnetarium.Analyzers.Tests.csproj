@@ -17,6 +17,7 @@
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageReference Include="NSec.Cryptography" Version="26.4.0" />
     <PackageReference Include="Sodium.Core" Version="1.4.1" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.84.0" />
   </ItemGroup>
 
   <ItemGroup>

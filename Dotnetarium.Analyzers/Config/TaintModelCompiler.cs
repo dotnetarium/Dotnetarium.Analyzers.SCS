@@ -83,7 +83,7 @@ namespace Dotnetarium.Config
             }
 
             foreach (var entry in model.TaintEntryPoints ?? new Dictionary<string, TaintEntryPointData>())
-                For(entry.Key).EntryPoint = entry.Value;
+                For(entry.Value.SourceType ?? entry.Key).EntryPoints.Add(entry.Value);
             foreach (var source in model.TaintSources ?? new List<TaintSource>())
                 if (Applies(source.TaintTypes, kind))
                     For(source.Type).Source = source;
@@ -107,7 +107,7 @@ namespace Dotnetarium.Config
             foreach (var (type, definition) in definitions)
             {
                 var source = definition.Source;
-                var entry = definition.EntryPoint;
+                var entries = definition.EntryPoints;
                 bool isInterface = source?.IsInterface == true || definition.IsInterface;
                 var methods = (source?.Methods ?? Array.Empty<string>())
                     .Select<string, (MethodMatcher, ImmutableHashSet<string>)>(name =>
@@ -138,14 +138,14 @@ namespace Dotnetarium.Config
                         transfers,
                         allProperitesAreTainted: true,
                         allFieldsAreTainted: true,
-                        dependencyFullTypeNames: entry?.Dependency?.ToImmutableArray()));
+                        dependencyFullTypeNames: entries.Count == 1 ? entries[0].Dependency?.ToImmutableArray() : null));
                     continue;
                 }
 
-                var parameters = entry == null
+                var parameters = entries.Count == 0
                     ? ImmutableHashSet<ParameterMatcher>.Empty
                     : ImmutableHashSet.Create<ParameterMatcher>((parameter, provider) =>
-                        IsInputParameter(parameter, provider, entry));
+                        entries.Any(entry => IsInputParameter(parameter, provider, entry)));
 
                 compiled.Add(new SourceInfo(
                     type,
@@ -162,7 +162,7 @@ namespace Dotnetarium.Config
                     transferMethods: transfers,
                     taintConstantArray: false,
                     constantArrayLengthMatcher: null,
-                    dependencyFullTypeNames: entry?.Dependency?.ToImmutableArray(),
+                    dependencyFullTypeNames: entries.Count == 1 ? entries[0].Dependency?.ToImmutableArray() : null,
                     taintedPropertyAttributes: (source?.PropertyAttributes ?? Array.Empty<string>())
                         .ToImmutableHashSet(StringComparer.Ordinal),
                     preserveTaintOnConversion: source?.PreserveTaintOnConversion ?? false,
@@ -182,7 +182,11 @@ namespace Dotnetarium.Config
             WellKnownTypeProvider provider,
             TaintEntryPointData entry)
         {
-            if (IsMinimalApiInputParameter(parameter, compilation))
+            if (entry.Dependency != null && entry.Dependency.Any(dependency =>
+                !provider.TryGetOrCreateTypeByMetadataName(dependency, out _)))
+                return false;
+            if (entry.Parameter?.Types == null && entry.Parameter?.Names == null &&
+                IsMinimalApiInputParameter(parameter, compilation))
                 return true;
             if (parameter.ContainingSymbol is not IMethodSymbol method ||
                 method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet)
@@ -218,6 +222,9 @@ namespace Dotnetarium.Config
 
                 if (HasAnyTypeAttribute(owner, provider, classRule.Attributes?.Exclude))
                     return false;
+                if (classRule.Attributes?.Required?.Count > 0 &&
+                    !HasAnyTypeAttribute(owner, provider, classRule.Attributes.Required))
+                    return false;
                 if (!classMatches &&
                     !HasAnyTypeAttribute(owner, provider, classRule.Attributes?.Include))
                     return false;
@@ -227,6 +234,18 @@ namespace Dotnetarium.Config
             if (methodRule != null)
             {
                 if (methodRule.Static.HasValue && methodRule.Static.Value != method.IsStatic)
+                    return false;
+                if (methodRule.IsOverride.HasValue && methodRule.IsOverride.Value != method.IsOverride)
+                    return false;
+                if (methodRule.OverriddenTypeAttributes?.Count > 0 &&
+                    !methodRule.OverriddenTypeAttributes.Any(check =>
+                        provider.TryGetOrCreateTypeByMetadataName(check.Type, out var attribute) &&
+                        OverridesMethodDeclaredOnAttributedType(method, attribute)))
+                    return false;
+                if (methodRule.OverriddenTypes?.Length > 0 &&
+                    !methodRule.OverriddenTypes.Any(typeName =>
+                        provider.TryGetOrCreateTypeByMetadataName(typeName, out var expected) &&
+                        OverridesMethodDeclaredOnType(method, expected)))
                     return false;
                 if (methodRule.IncludeConstructor == false && method.MethodKind == MethodKind.Constructor)
                     return false;
@@ -241,6 +260,16 @@ namespace Dotnetarium.Config
                 if (HasAnyMethodAttribute(method, provider, methodRule.Attributes?.Exclude))
                     return false;
             }
+
+            if (entry.Parameter?.Names != null && !entry.Parameter.Names.Contains(parameter.Name))
+                return false;
+            if (entry.Parameter?.Types != null && !entry.Parameter.Types.Any(typeName =>
+                provider.TryGetOrCreateTypeByMetadataName(typeName, out var expected) &&
+                parameter.Type is INamedTypeSymbol actual &&
+                (SymbolEqualityComparer.Default.Equals(actual.OriginalDefinition, expected.OriginalDefinition) ||
+                 actual.AllInterfaces.Any(candidate => SymbolEqualityComparer.Default.Equals(
+                     candidate.OriginalDefinition, expected.OriginalDefinition)))))
+                return false;
 
             return !HasAnyParameterAttribute(parameter, provider, entry.Parameter?.Attributes?.Exclude);
         }
@@ -375,6 +404,33 @@ namespace Dotnetarium.Config
             checks?.Any(check => provider.TryGetOrCreateTypeByMetadataName(check.Type, out var attribute) &&
                 symbol.HasDerivedTypeAttribute(attribute)) == true;
 
+        private static bool OverridesMethodDeclaredOnAttributedType(
+            IMethodSymbol method,
+            INamedTypeSymbol attribute)
+        {
+            for (var overridden = method.OverriddenMethod; overridden != null;
+                overridden = overridden.OverriddenMethod)
+            {
+                if (overridden.ContainingType.HasAnyAttribute(attribute))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool OverridesMethodDeclaredOnType(
+            IMethodSymbol method,
+            INamedTypeSymbol expected)
+        {
+            for (var overridden = method.OverriddenMethod; overridden != null;
+                overridden = overridden.OverriddenMethod)
+            {
+                if (SymbolEqualityComparer.Default.Equals(overridden.ContainingType.OriginalDefinition,
+                    expected.OriginalDefinition))
+                    return true;
+            }
+            return false;
+        }
+
         private static bool HasAnyMethodAttribute(
             IMethodSymbol symbol,
             WellKnownTypeProvider provider,
@@ -488,7 +544,7 @@ namespace Dotnetarium.Config
 
         private sealed class SourceDefinition
         {
-            public TaintEntryPointData EntryPoint { get; set; }
+            public List<TaintEntryPointData> EntryPoints { get; } = new List<TaintEntryPointData>();
             public TaintSource Source { get; set; }
             public bool IsInterface { get; set; }
             public List<TransferInfo> Transfers { get; } = new List<TransferInfo>();

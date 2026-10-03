@@ -767,11 +767,237 @@ public sealed class AnalyzerSmokeTests
         Assert.Contains(findings, diagnostic => diagnostic.GetMessage().Contains("cross-site", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Grpc_service_requests_stream_messages_and_headers_are_untrusted()
+    {
+        var source = """
+            using System.Diagnostics;
+            using System.Threading.Tasks;
+            using Google.Protobuf.WellKnownTypes;
+            using Grpc.Core;
+
+            [BindServiceMethod(typeof(GeneratedService), "BindService")]
+            public abstract class GeneratedServiceBase
+            {
+                public virtual Task Unary(StringValue request, ServerCallContext context) => Task.CompletedTask;
+                public virtual Task Upload(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context) => Task.CompletedTask;
+                public virtual Task UploadAll(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context) => Task.CompletedTask;
+            }
+            public static class GeneratedService { }
+
+            public abstract class ServiceHelperBase : GeneratedServiceBase
+            {
+                public virtual Task HelperOverride(StringValue local) => Task.CompletedTask;
+            }
+
+            public sealed class Service : ServiceHelperBase
+            {
+                public override Task Unary(StringValue request, ServerCallContext context)
+                {
+                    _ = Process.Start(request.Value);
+                    _ = Process.Start(context.RequestHeaders.GetValue("x-file"));
+                    _ = Process.Start(context.Method);
+                    _ = Process.Start(new Metadata().GetValue("local")!);
+                    return Task.CompletedTask;
+                }
+
+                public override async Task Upload(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context)
+                {
+                    if (await requestStream.MoveNext())
+                        _ = Process.Start(requestStream.Current.Value);
+                }
+
+                public override async Task UploadAll(IAsyncStreamReader<StringValue> requestStream, ServerCallContext context)
+                {
+                    await foreach (var message in requestStream.ReadAllAsync())
+                        _ = Process.Start(message.Value);
+                }
+
+                public void Helper(StringValue local) => _ = Process.Start(local.Value);
+                public override Task HelperOverride(StringValue local)
+                {
+                    _ = Process.Start(local.Value);
+                    return Task.CompletedTask;
+                }
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source, new CommandInjectionTaintAnalyzer());
+
+        var findings = diagnostics.Where(diagnostic => diagnostic.Id == "DNA0002").ToArray();
+        Assert.Equal(4, findings.Length);
+        var reportedLines = findings.Select(diagnostic =>
+            source.Split('\n')[diagnostic.Location.GetLineSpan().StartLinePosition.Line]).ToArray();
+        Assert.Contains(reportedLines, line => line.Contains("request.Value", StringComparison.Ordinal));
+        Assert.Contains(reportedLines, line => line.Contains("RequestHeaders.GetValue", StringComparison.Ordinal));
+        Assert.Contains(reportedLines, line => line.Contains("requestStream.Current.Value", StringComparison.Ordinal));
+        Assert.Contains(reportedLines, line => line.Contains("message.Value", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Grpc_server_interceptor_requests_are_untrusted()
+    {
+        var source = """
+            using System.Diagnostics;
+            using System.Threading.Tasks;
+            using Grpc.Core;
+            using Grpc.Core.Interceptors;
+            public sealed class ProbeInterceptor : Interceptor
+            {
+                public override Task<TResponse> UnaryServerHandler<TRequest, TResponse>(
+                    TRequest request, ServerCallContext context,
+                    UnaryServerMethod<TRequest, TResponse> continuation)
+                {
+                    _ = Process.Start(request.ToString());
+                    return continuation(request, context);
+                }
+
+                public override Task<TResponse> ClientStreamingServerHandler<TRequest, TResponse>(
+                    IAsyncStreamReader<TRequest> requestStream, ServerCallContext context,
+                    ClientStreamingServerMethod<TRequest, TResponse> continuation)
+                {
+                    _ = Process.Start(requestStream.Current.ToString());
+                    return continuation(requestStream, context);
+                }
+
+                public override Task ServerStreamingServerHandler<TRequest, TResponse>(
+                    TRequest request, IServerStreamWriter<TResponse> responseStream,
+                    ServerCallContext context, ServerStreamingServerMethod<TRequest, TResponse> continuation)
+                {
+                    _ = Process.Start(request.ToString());
+                    return continuation(request, responseStream, context);
+                }
+
+                public override Task DuplexStreamingServerHandler<TRequest, TResponse>(
+                    IAsyncStreamReader<TRequest> requestStream, IServerStreamWriter<TResponse> responseStream,
+                    ServerCallContext context, DuplexStreamingServerMethod<TRequest, TResponse> continuation)
+                {
+                    _ = Process.Start(requestStream.Current.ToString());
+                    return continuation(requestStream, responseStream, context);
+                }
+
+                public override TResponse BlockingUnaryCall<TRequest, TResponse>(
+                    TRequest request, ClientInterceptorContext<TRequest, TResponse> context,
+                    BlockingUnaryCallContinuation<TRequest, TResponse> continuation)
+                {
+                    _ = Process.Start(request.ToString());
+                    return continuation(request, context);
+                }
+
+                public void Helper(string local) => _ = Process.Start(local);
+            }
+            """;
+        var diagnostics = await AnalyzeAsync(source, new CommandInjectionTaintAnalyzer());
+        Assert.Equal(4, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0002"));
+    }
+
+    [Fact]
+    public async Task Grpc_channel_address_is_an_ssrf_sink()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System;
+            using Grpc.Net.Client;
+            public static class Probe
+            {
+                public static void Run()
+                {
+                    var input = Console.ReadLine()!;
+                    using var dynamicChannel = GrpcChannel.ForAddress(input);
+                    using var fixedChannel = GrpcChannel.ForAddress("https://example.test");
+                }
+            }
+            """, new ServerSideRequestForgeryTaintAnalyzer());
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0011"));
+    }
+
+    [Fact]
+    public async Task Grpc_request_controls_outbound_grpc_channel_address()
+    {
+        var diagnostics = await AnalyzeAsync("""
+            using System.Threading.Tasks;
+            using Google.Protobuf.WellKnownTypes;
+            using Grpc.Core;
+            using Grpc.Net.Client;
+            [BindServiceMethod(typeof(Generated), "BindService")]
+            public abstract class GeneratedBase
+            {
+                public virtual Task Route(StringValue request, ServerCallContext context) => Task.CompletedTask;
+            }
+            public static class Generated { }
+            public sealed class Service : GeneratedBase
+            {
+                public override Task Route(StringValue request, ServerCallContext context)
+                {
+                    using var channel = GrpcChannel.ForAddress(request.Value);
+                    return Task.CompletedTask;
+                }
+            }
+            """, new ServerSideRequestForgeryTaintAnalyzer());
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0011"));
+    }
+
+    [Fact]
+    public async Task Grpc_configuration_checks_require_explicit_unsafe_settings()
+    {
+        var source = """
+            using System;
+            using System.Threading.Tasks;
+            using Grpc.Core;
+            using Grpc.Net.Client;
+            using Grpc.AspNetCore.Server;
+            using Microsoft.Extensions.DependencyInjection;
+            public static class Probe
+            {
+                public static void Configure(IServiceCollection services, bool development)
+                {
+                    services.AddGrpc(options => options.EnableDetailedErrors = true);
+                    services.AddGrpc().AddServiceOptions<ProbeService>(options => options.EnableDetailedErrors = true);
+                    if (development)
+                        services.AddGrpc(options => options.EnableDetailedErrors = true);
+                    services.AddGrpc(options => options.EnableDetailedErrors = false);
+                    var unused = new GrpcServiceOptions { EnableDetailedErrors = true };
+
+                    var callCredentials = CallCredentials.FromInterceptor((context, metadata) => Task.CompletedTask);
+                    using var unsafeChannel = GrpcChannel.ForAddress("http://remote.example", new GrpcChannelOptions
+                    {
+                        UnsafeUseInsecureChannelCallCredentials = true,
+                        Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
+                    });
+                    using var localChannel = GrpcChannel.ForAddress("http://localhost:5000", new GrpcChannelOptions
+                    {
+                        UnsafeUseInsecureChannelCallCredentials = true,
+                        Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
+                    });
+                    using var tlsChannel = GrpcChannel.ForAddress("https://remote.example", new GrpcChannelOptions
+                    {
+                        UnsafeUseInsecureChannelCallCredentials = true,
+                        Credentials = ChannelCredentials.Create(ChannelCredentials.Insecure, callCredentials)
+                    });
+                    using var noCallCredentials = GrpcChannel.ForAddress("http://remote.example", new GrpcChannelOptions
+                    {
+                        UnsafeUseInsecureChannelCallCredentials = true,
+                        Credentials = ChannelCredentials.Insecure
+                    });
+                }
+            }
+            public sealed class ProbeService { }
+            """;
+        var diagnostics = await AnalyzeAsync(source, new GrpcConfigurationAnalyzer());
+        Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0018"));
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "DNA0019"));
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source, params DiagnosticAnalyzer[] analyzers)
     {
         var trustedAssemblies = (string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!;
         var references = trustedAssemblies.Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path))
+            .Concat([
+                MetadataReference.CreateFromFile(typeof(Grpc.Core.ServerCallContext).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Google.Protobuf.WellKnownTypes.StringValue).Assembly.Location),
+                MetadataReference.CreateFromFile(System.Reflection.Assembly.Load("Grpc.Net.Common").Location),
+                MetadataReference.CreateFromFile(typeof(Grpc.Net.Client.GrpcChannel).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Grpc.AspNetCore.Server.GrpcServiceOptions).Assembly.Location)
+            ])
             .ToArray();
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "Example.cs");
         var compilation = CSharpCompilation.Create("Example", new[] { tree }, references,

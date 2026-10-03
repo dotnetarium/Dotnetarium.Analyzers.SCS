@@ -227,6 +227,7 @@ public sealed partial class SinkCoverageTests
         foreach (var member in new[] { "PostAsync", "PutAsync", "PatchAsync" })
             yield return M("System.Net.Http.HttpClient", "DNA0011", member, $"_ = new System.Net.Http.HttpClient().{member}(input, new System.Net.Http.StringContent(\"body\"));");
         yield return M("System.Net.Http.HttpRequestMessage", "DNA0011", ".ctor", "_ = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, input);");
+        yield return M("Grpc.Net.Client.GrpcChannel", "DNA0011", "ForAddress", "_ = Grpc.Net.Client.GrpcChannel.ForAddress(input);");
         yield return P("System.Net.Http.HttpRequestMessage", "DNA0011", "RequestUri", "new System.Net.Http.HttpRequestMessage().RequestUri = new System.Uri(input);");
         foreach (var member in new[] { "EvaluateAsync", "RunAsync" })
             yield return M("Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript", "DNA0012", member, $"_ = Microsoft.CodeAnalysis.CSharp.Scripting.CSharpScript.{member}(input);");
