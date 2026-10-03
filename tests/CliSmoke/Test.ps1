@@ -27,6 +27,7 @@ using System.Collections.Generic;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Dapper;
 using Npgsql;
@@ -56,6 +57,7 @@ public class Custom
 }
 
 public sealed class HubService { public string Command => "fixed"; }
+public sealed class BodyInput { public string Command { get; set; } = ""; }
 public sealed class InputHub : Hub
 {
     public void Execute(string command, HubService service)
@@ -76,6 +78,12 @@ public static class HubRegistration
         services.AddSignalR();
     }
     public static void Map(IEndpointRouteBuilder endpoints) => endpoints.MapHub<InputHub>("/input");
+    public static void MapBody(WebApplication app)
+    {
+        app.MapPost("/body", (BodyInput body) => Process.Start(body.Command));
+        app.MapPost("/upload", (IFormFile file) => Process.Start(file.FileName));
+        app.MapPost("/service", (HubService service) => Process.Start(service.Command));
+    }
 }
 
 namespace Newtonsoft.Json
@@ -132,7 +140,7 @@ if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default 
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
-    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 3 -or
+    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 5 -or
     @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
     @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))

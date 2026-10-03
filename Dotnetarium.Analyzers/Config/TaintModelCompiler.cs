@@ -46,7 +46,7 @@ namespace Dotnetarium.Config
     {
         private readonly ConfigData model;
         private readonly Compilation compilation;
-        private readonly Lazy<ImmutableHashSet<IMethodSymbol>> minimalApiHandlers;
+        private readonly Lazy<ImmutableDictionary<IMethodSymbol, bool>> minimalApiHandlers;
         private readonly Lazy<SignalRInputModel> signalRInputs;
         private readonly WellKnownTypeProvider types;
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SourceInfo>> sourceMaps = new();
@@ -57,7 +57,7 @@ namespace Dotnetarium.Config
         {
             this.model = model;
             this.compilation = compilation;
-            minimalApiHandlers = new Lazy<ImmutableHashSet<IMethodSymbol>>(FindMinimalApiHandlers);
+            minimalApiHandlers = new Lazy<ImmutableDictionary<IMethodSymbol, bool>>(FindMinimalApiHandlers);
             signalRInputs = new Lazy<SignalRInputModel>(() => new SignalRInputModel(compilation));
             types = WellKnownTypeProvider.GetOrCreate(compilation);
         }
@@ -280,7 +280,7 @@ namespace Dotnetarium.Config
 
         private bool IsMinimalApiInputParameter(IParameterSymbol parameter, Compilation compilation)
         {
-            if (HasAttribute(parameter, "Microsoft.AspNetCore.Mvc.FromServicesAttribute"))
+            if (HasServiceBindingAttribute(parameter))
                 return false;
 
             if (!IsMinimalApiHandlerParameter(parameter))
@@ -292,9 +292,23 @@ namespace Dotnetarium.Config
             if (HasRequestBindingAttribute(parameter))
                 return true;
 
-            // Simple parameters are inferred from the route, query, header, or form.
-            // Complex parameters can also be DI services, so require explicit binding.
-            return IsSimpleRequestType(parameter.Type);
+            var typeName = parameter.Type.ToDisplayString();
+            if (typeName is "Microsoft.AspNetCore.Http.IFormFile" or
+                "Microsoft.AspNetCore.Http.IFormFileCollection" or "System.IO.Stream" or
+                "System.IO.Pipelines.PipeReader")
+                return true;
+            if (IsSimpleRequestType(parameter.Type) || HasRequestParser(parameter.Type) ||
+                parameter.Type is IArrayTypeSymbol array &&
+                (IsSimpleRequestType(array.ElementType) || HasRequestParser(array.ElementType)))
+                return true;
+            if (DependencyInjectionRegistrationModel.GetOrCreate(compilation).HasPossibleRegistration(parameter.Type))
+                return false;
+            if (parameter.Type is INamedTypeSymbol named &&
+                (named.IsAbstract && named.TypeKind != TypeKind.Interface ||
+                 named.TypeKind == TypeKind.Interface && !IsJsonCollectionType(named) ||
+                 HasCustomRequestBinder(named)))
+                return false;
+            return AllowsInferredBody(parameter);
         }
 
         private bool IsMinimalApiHandlerParameter(IParameterSymbol parameter)
@@ -307,9 +321,48 @@ namespace Dotnetarium.Config
                 IsMinimalApiMapMethod(compilation.GetSemanticModel(invocation.SyntaxTree)
                     .GetSymbolInfo(invocation).Symbol as IMethodSymbol);
             var isNamedHandler = parameter.ContainingSymbol is IMethodSymbol owner &&
-                minimalApiHandlers.Value.Contains(owner);
+                minimalApiHandlers.Value.ContainsKey(owner);
             return isLambdaHandler || isNamedHandler;
         }
+
+        private bool AllowsInferredBody(IParameterSymbol parameter)
+        {
+            var syntax = parameter.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+            var lambda = syntax?.AncestorsAndSelf().OfType<LambdaExpressionSyntax>().FirstOrDefault();
+            var argument = lambda?.Ancestors().OfType<ArgumentSyntax>().FirstOrDefault();
+            if (argument?.Parent?.Parent is InvocationExpressionSyntax invocation &&
+                compilation.GetSemanticModel(invocation.SyntaxTree).GetSymbolInfo(invocation).Symbol is IMethodSymbol map)
+                return SupportsInferredBody(map);
+            return parameter.ContainingSymbol is IMethodSymbol owner &&
+                minimalApiHandlers.Value.TryGetValue(owner, out var allowed) && allowed;
+        }
+
+        private static bool SupportsInferredBody(IMethodSymbol map) => map.Name is "MapPost" or "MapPut" or "MapPatch";
+
+        private static bool HasRequestParser(ITypeSymbol type) =>
+            type.GetMembers("TryParse").OfType<IMethodSymbol>().Any(method => method.IsStatic &&
+                method.DeclaredAccessibility == Accessibility.Public && method.ReturnType.SpecialType == SpecialType.System_Boolean &&
+                method.Parameters.Length is 2 or 3 &&
+                method.Parameters[0].Type.SpecialType == SpecialType.System_String &&
+                method.Parameters.Last().RefKind == RefKind.Out &&
+                SymbolEqualityComparer.Default.Equals(method.Parameters.Last().Type, type));
+
+        private static bool IsJsonCollectionType(INamedTypeSymbol type) => type.OriginalDefinition.ToDisplayString() is
+            "System.Collections.Generic.IEnumerable<T>" or "System.Collections.Generic.ICollection<T>" or
+            "System.Collections.Generic.IList<T>" or "System.Collections.Generic.IReadOnlyCollection<T>" or
+            "System.Collections.Generic.IReadOnlyList<T>" or "System.Collections.Generic.IDictionary<TKey, TValue>" or
+            "System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>";
+
+        private static bool HasCustomRequestBinder(INamedTypeSymbol type) =>
+            type.GetBaseTypesAndThis().Any(owner => owner.GetMembers().OfType<IMethodSymbol>()
+                .Any(method => method.IsStatic && (method.Name == "BindAsync" || method.Name.EndsWith(".BindAsync", StringComparison.Ordinal)))) ||
+            type.AllInterfaces.Any(contract => contract.OriginalDefinition.MetadataName == "IBindableFromHttpContext`1" &&
+                contract.ContainingNamespace.ToDisplayString() == "Microsoft.AspNetCore.Http");
+
+        private static bool HasServiceBindingAttribute(ISymbol symbol) => symbol.GetAttributes().Any(attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "Microsoft.Extensions.DependencyInjection.FromKeyedServicesAttribute" ||
+            attribute.AttributeClass?.AllInterfaces.Any(type =>
+                type.ToDisplayString() == "Microsoft.AspNetCore.Http.Metadata.IFromServiceMetadata") == true);
 
         private bool IsMixedAggregateRequestProperty(IPropertyReferenceOperation property)
         {
@@ -318,7 +371,7 @@ namespace Dotnetarium.Config
                 !HasAttribute(reference.Parameter, "Microsoft.AspNetCore.Http.AsParametersAttribute") ||
                 !IsMinimalApiHandlerParameter(reference.Parameter) ||
                 IsRequestOnlyAggregate(reference.Parameter.Type) ||
-                HasAttribute(property.Property, "Microsoft.AspNetCore.Mvc.FromServicesAttribute"))
+                HasServiceBindingAttribute(property.Property))
                 return false;
 
             return IsRequestBoundMember(aggregate, property.Property);
@@ -345,9 +398,7 @@ namespace Dotnetarium.Config
                 .SelectMany(constructor => constructor.Parameters)
                 .Where(parameter => string.Equals(parameter.Name, property.Name,
                     StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (HasAttribute(property, "Microsoft.AspNetCore.Mvc.FromServicesAttribute") ||
-                constructorParameters.Any(parameter => HasAttribute(parameter,
-                    "Microsoft.AspNetCore.Mvc.FromServicesAttribute")))
+            if (HasServiceBindingAttribute(property) || constructorParameters.Any(HasServiceBindingAttribute))
                 return false;
 
             bool settable = property.SetMethod?.DeclaredAccessibility == Accessibility.Public;
@@ -376,21 +427,25 @@ namespace Dotnetarium.Config
         private static bool HasAttribute(ISymbol symbol, string name) =>
             symbol.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == name);
 
-        private ImmutableHashSet<IMethodSymbol> FindMinimalApiHandlers()
+        private ImmutableDictionary<IMethodSymbol, bool> FindMinimalApiHandlers()
         {
-            var handlers = ImmutableHashSet.CreateBuilder<IMethodSymbol>(SymbolEqualityComparer.Default);
+            var handlers = ImmutableDictionary.CreateBuilder<IMethodSymbol, bool>(SymbolEqualityComparer.Default);
             foreach (var tree in compilation.SyntaxTrees)
             {
                 var model = compilation.GetSemanticModel(tree);
                 foreach (var invocation in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
                 {
-                    if (!IsMinimalApiMapMethod(model.GetSymbolInfo(invocation).Symbol as IMethodSymbol) ||
+                    var map = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                    if (!IsMinimalApiMapMethod(map) ||
                         invocation.ArgumentList.Arguments.LastOrDefault() is not { } handlerArgument)
                         continue;
                     var binding = model.GetSymbolInfo(handlerArgument.Expression);
                     if ((binding.Symbol as IMethodSymbol ?? binding.CandidateSymbols.OfType<IMethodSymbol>().SingleOrDefault())
                         is { } handler)
-                        handlers.Add(handler);
+                    {
+                        bool allowed = SupportsInferredBody(map);
+                        handlers[handler] = handlers.TryGetValue(handler, out var previous) ? previous && allowed : allowed;
+                    }
                 }
             }
             return handlers.ToImmutable();
