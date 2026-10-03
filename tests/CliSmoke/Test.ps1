@@ -302,6 +302,41 @@ if ($LASTEXITCODE -ne 2 -or -not ($badOutput -match 'Invalid dotnetarium.json'))
     throw 'CLI did not reject an invalid JSON rule field.'
 }
 
+# Test metadata suppresses only certificate bypasses, for both the package and CLI.
+$applicationProjectXml = Get-Content -LiteralPath $project -Raw
+$testProjectXml = $applicationProjectXml.Replace('</Project>', '<PropertyGroup><IsTestProject>true</IsTestProject></PropertyGroup></Project>')
+$testProjectXml | Set-Content -LiteralPath $project -Encoding utf8
+$testBuild = & dotnet build $project --no-restore --nologo -v quiet -p:UseSharedCompilation=false 2>&1
+if ($LASTEXITCODE -ne 0 -or ($testBuild -match 'DNA0020') -or -not ($testBuild -match 'DNA0001')) {
+    $testBuild | Write-Output
+    throw 'Analyzer package did not honor test-project metadata while preserving other rules.'
+}
+$testOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ($testOutput -match 'DNA0020') -or -not ($testOutput -match 'DNA0001')) {
+    throw 'CLI did not honor test-project metadata while preserving other rules.'
+}
+$globalConfig = Join-Path $projectPath '.globalconfig'
+"is_global = true`ndotnetarium_analyze_test_certificates = true" | Set-Content -LiteralPath $globalConfig -Encoding utf8
+$testOptInOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ([regex]::Matches(($testOptInOutput -join "`n"), 'DNA0020')).Count -ne 4) {
+    throw 'Test-project certificate opt-in did not restore CLI findings.'
+}
+Remove-Item -LiteralPath $globalConfig
+
+# The tool must also read evaluated metadata without our NuGet props present.
+$testProjectXml.Replace("<PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" />", '') |
+    Set-Content -LiteralPath $project -Encoding utf8
+& dotnet restore $project --configfile $nugetConfig --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { throw 'Standalone CLI test fixture restore failed.' }
+$standaloneTestOutput = & $tool $project
+if ($LASTEXITCODE -ne 0 -or ($standaloneTestOutput -match 'DNA0020') -or -not ($standaloneTestOutput -match 'DNA0001')) {
+    $standaloneTestOutput | Write-Output
+    throw 'Standalone CLI did not read evaluated test-project metadata.'
+}
+$applicationProjectXml | Set-Content -LiteralPath $project -Encoding utf8
+& dotnet restore $project --configfile $nugetConfig --nologo -v quiet
+if ($LASTEXITCODE -ne 0) { throw 'Application fixture restore failed.' }
+
 Add-Content -LiteralPath (Join-Path $projectPath 'Unsafe Input.cs') -Value 'class Broken { MissingType value; }'
 $incompleteSarif = Join-Path $scratch 'incomplete.sarif'
 $invalidProjectOutput = & $tool $project --sarif $incompleteSarif 2>&1

@@ -45,6 +45,29 @@ public sealed class CertificateValidationTests
     [InlineData("if (environment.IsDevelopment() && enabled) new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
     [InlineData("if (!environment.IsDevelopment()) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
     [InlineData("if (environment.IsDevelopment() || enabled) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (!environment.IsProduction()) new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (environment.IsProduction()) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (environment.IsProduction()) new HttpClientHandler(); else new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (!environment.IsProduction() && enabled) new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (!environment.IsProduction() || enabled) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (environment.IsEnvironment(\"Testing\")) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (environment.IsEnvironment(\"Development\")) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (environment.IsStaging()) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (IsProduction()) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("var development = environment.IsDevelopment(); if (development) new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("var production = environment.IsProduction(); if (!production) new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("var development = environment.IsDevelopment(); development = enabled; if (development) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("var development = environment.IsDevelopment(); ChangeBool(ref development); if (development) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("var development = environment.IsDevelopment(); Action change = () => development = enabled; if (development) new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (!environment.IsDevelopment()) return; new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (environment.IsProduction()) return; new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (!environment.IsDevelopment()) { return; } new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (environment.IsProduction()) throw new Exception(); new SslStream(new MemoryStream(), false, RemoteAccept);", 0)]
+    [InlineData("if (environment.IsDevelopment()) return; new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (!environment.IsDevelopment()) { if (enabled) return; } new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (environment.IsProduction() && enabled) return; new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("if (!environment.IsDevelopment()) return; Action deferred = () => { new SslStream(new MemoryStream(), false, RemoteAccept); };", 1)]
+    [InlineData("if (enabled) goto configure; if (environment.IsProduction()) return; configure: new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
     [InlineData("if (enabled) new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };", 1)]
     [InlineData("if (IsDevelopment()) new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };", 1)]
     [InlineData("new HttpClientHandler { ServerCertificateCustomValidationCallback = (request, _, _, errors) => request.RequestUri.IsLoopback || errors == SslPolicyErrors.None };", 0)]
@@ -56,7 +79,44 @@ public sealed class CertificateValidationTests
     [InlineData("if (environment.IsDevelopment()) ServicePointManager.ServerCertificateValidationCallback += RemoteAccept;", 0)]
     [InlineData("#pragma warning disable DNA0020\nnew HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };\n#pragma warning restore DNA0020\n", 0)]
     [InlineData("ServicePointManager.ServerCertificateValidationCallback = (_, _, _, errors) => { if (errors != SslPolicyErrors.None) throw new AuthenticationException(); return true; }; ServicePointManager.ServerCertificateValidationCallback += RemoteAccept;", 0)]
-    public async Task Known_bypass_configuration_is_reported_and_validation_is_preserved(string statement, int expected)
+    public Task Known_bypass_configuration_is_reported_and_validation_is_preserved(string statement, int expected) =>
+        AssertDiagnostics(statement, expected);
+
+    [Theory]
+    [InlineData("#if DEBUG\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif", 0)]
+    [InlineData("#if !DEBUG\nnew HttpClientHandler();\n#else\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif", 0)]
+    [InlineData("#if DEBUG && TRACE\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif", 0)]
+    [InlineData("#if DEBUG || TRACE\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif", 1)]
+    [InlineData("#if TRACE\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif", 1)]
+    [InlineData("new SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("#if DEBUG\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif\nnew SslStream(new MemoryStream(), false, RemoteAccept);", 1)]
+    [InlineData("#if DEBUG\nnew HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };\n#endif", 0)]
+    [InlineData("#if DEBUG\nif (enabled) {\n#if TRACE\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif\n}\n#endif", 0)]
+    public Task Debug_only_configuration_is_exempt_but_shared_code_is_not(string statement, int expected) =>
+        AssertDiagnostics(statement, expected, ["DEBUG", "TRACE"]);
+
+    [Fact]
+    public Task Source_defined_debug_symbol_is_not_a_release_exclusion() =>
+        AssertDiagnostics("#if DEBUG\nnew SslStream(new MemoryStream(), false, RemoteAccept);\n#endif", 1,
+            ["DEBUG"], sourcePrefix: "#define DEBUG\n");
+
+    [Theory]
+    [InlineData("true", "", 0)]
+    [InlineData("TRUE", "false", 0)]
+    [InlineData("true", "true", 1)]
+    [InlineData("false", "false", 1)]
+    [InlineData("", "", 1)]
+    [InlineData("unknown", "false", 1)]
+    public Task Test_project_metadata_and_opt_in_control_only_this_rule(string isTestProject, string includeTests, int expected) =>
+        AssertDiagnostics("new SslStream(new MemoryStream(), false, RemoteAccept);", expected, null,
+            new Dictionary<string, string>
+            {
+                ["build_property.IsTestProject"] = isTestProject,
+                ["dotnetarium_analyze_test_certificates"] = includeTests
+            });
+
+    private static async Task AssertDiagnostics(string statement, int expected, string[]? symbols = null,
+        Dictionary<string, string>? settings = null, string sourcePrefix = "")
     {
         var source = """
             using System;
@@ -83,6 +143,8 @@ public sealed class CertificateValidationTests
             """ + "\n" + statement + "\n" + """
                 }
                 private static bool IsDevelopment() => true;
+                private static bool IsProduction() => true;
+                private static void ChangeBool(ref bool value) { value = true; }
                 private static bool HttpAccept(HttpRequestMessage request, X509Certificate2 certificate, X509Chain chain, SslPolicyErrors errors) => true;
                 private static bool RemoteAccept(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors) { return true; }
                 private static bool RemoteValidate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors) => errors == SslPolicyErrors.None;
@@ -95,12 +157,25 @@ public sealed class CertificateValidationTests
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path));
         var compilation = CSharpCompilation.Create("TlsProbe",
-            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), "Tls.cs")], references,
+            [CSharpSyntaxTree.ParseText(sourcePrefix + source, new CSharpParseOptions(LanguageVersion.Preview, preprocessorSymbols: symbols), "Tls.cs")], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.Empty(compilation.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
-        var diagnostics = await compilation.WithAnalyzers([new CertificateValidationAnalyzer()]).GetAnalyzerDiagnosticsAsync();
+        var options = new AnalyzerOptions([], new TestOptionsProvider(settings ?? []));
+        var diagnostics = await compilation.WithAnalyzers([new CertificateValidationAnalyzer()], options).GetAnalyzerDiagnosticsAsync();
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "AD0001");
         Assert.Equal(expected, diagnostics.Count(diagnostic => diagnostic.Id == "DNA0020"));
         Assert.All(diagnostics, diagnostic => Assert.Equal("Tls.cs", diagnostic.Location.SourceTree!.FilePath));
+    }
+
+    private sealed class TestOptionsProvider(Dictionary<string, string> settings) : AnalyzerConfigOptionsProvider
+    {
+        public override AnalyzerConfigOptions GlobalOptions { get; } = new TestOptions(settings);
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => new TestOptions([]);
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => new TestOptions([]);
+    }
+
+    private sealed class TestOptions(Dictionary<string, string> settings) : AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value) => settings.TryGetValue(key, out value!);
     }
 }
