@@ -84,9 +84,6 @@
       <TfmSpecificPackageFile Include="$(OutputPath)\Dotnetarium.Analyzers.dll" PackagePath="analyzers/dotnet" />
       <TfmSpecificPackageFile Include="$(OutputPath)\System.Text.Json.dll" PackagePath="analyzers/dotnet" />
       <TfmSpecificPackageFile Include="$(OutputPath)\Microsoft.Bcl.AsyncInterfaces.dll;$(OutputPath)\System.Buffers.dll;$(OutputPath)\System.IO.Pipelines.dll;$(OutputPath)\System.Memory.dll;$(OutputPath)\System.Numerics.Vectors.dll;$(OutputPath)\System.Runtime.CompilerServices.Unsafe.dll;$(OutputPath)\System.Text.Encodings.Web.dll;$(OutputPath)\System.Threading.Tasks.Extensions.dll" PackagePath="analyzers/dotnet" />
-      <TfmSpecificPackageFile Include="$(OutputPath)\Dotnetarium.Analyzers.dll" PackagePath="lib/netstandard2.0" />
-      <TfmSpecificPackageFile Include="$(OutputPath)\System.Text.Json.dll" PackagePath="lib/netstandard2.0" />
-      <TfmSpecificPackageFile Include="$(OutputPath)\Microsoft.Bcl.AsyncInterfaces.dll;$(OutputPath)\System.Buffers.dll;$(OutputPath)\System.IO.Pipelines.dll;$(OutputPath)\System.Memory.dll;$(OutputPath)\System.Numerics.Vectors.dll;$(OutputPath)\System.Runtime.CompilerServices.Unsafe.dll;$(OutputPath)\System.Text.Encodings.Web.dll;$(OutputPath)\System.Threading.Tasks.Extensions.dll" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
   </Target>
 </Project>

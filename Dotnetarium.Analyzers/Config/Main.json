@@ -99,6 +99,23 @@
       },
       "Parameter": { "Names": [ "request", "requestStream" ] }
     },
+    "AzureFunction": {
+      "SourceType": "System.Object",
+      "Dependency": [ "Microsoft.Azure.Functions.Worker.FunctionAttribute" ],
+      "Method": { "Accessibility": [ "public" ], "IncludeConstructor": false },
+      "Parameter": { "Binding": "AzureFunctions" }
+    },
+    "SignalRHub": {
+      "SourceType": "System.Object",
+      "Dependency": [ "Microsoft.AspNetCore.SignalR.Hub" ],
+      "Class": { "Parent": "Microsoft.AspNetCore.SignalR.Hub" },
+      "Method": {
+        "Accessibility": [ "public" ],
+        "IncludeConstructor": false,
+        "Static": false
+      },
+      "Parameter": { "Binding": "SignalR" }
+    },
     "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
       "Class": {
         "Accessibility": [
@@ -124,6 +141,18 @@
     }
   },
   "TaintSources": [
+    {
+      "Type": "Microsoft.Azure.Functions.Worker.Http.HttpRequestData",
+      "Properties": [ "Body", "Headers", "Cookies", "Url", "Query" ]
+    },
+    {
+      "Type": "Microsoft.Azure.Functions.Worker.Http.HttpRequestDataExtensions",
+      "Methods": [ "ReadAsString", "ReadAsStringAsync", "ReadFromJsonAsync" ]
+    },
+    {
+      "Type": "Microsoft.AspNetCore.Http.WebSocketManager",
+      "Methods": [ "AcceptWebSocketAsync" ]
+    },
     {
       "Type": "Grpc.Core.ServerCallContext",
       "Properties": [ "RequestHeaders" ]
@@ -867,6 +896,14 @@
   ],
   "Transfers": [
     {
+      "Type": "System.Net.WebSockets.WebSocket",
+      "Methods": [ { "Name": "ReceiveAsync", "InOut": [ { ".This": "buffer" } ] } ]
+    },
+    {
+      "Type": "System.IO.Pipelines.PipeReader",
+      "Methods": [ { "Name": "TryRead", "InOut": [ { ".This": "result" } ] } ]
+    },
+    {
       "Type": "System.Uri",
       "Methods": [
         {
@@ -967,6 +1004,10 @@
     {
       "Type": "System.IO.Stream",
       "Methods": [
+        { "Name": "ReadExactly", "InOut": [ { ".This": "buffer" } ] },
+        { "Name": "ReadExactlyAsync", "InOut": [ { ".This": "buffer" } ] },
+        { "Name": "ReadAtLeast", "InOut": [ { ".This": "buffer" } ] },
+        { "Name": "ReadAtLeastAsync", "InOut": [ { ".This": "buffer" } ] },
         {
           "Name": "BeginWrite",
           "InOut": [

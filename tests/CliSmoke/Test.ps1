@@ -22,9 +22,22 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not create CLI fixture.' }
 using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.IO;
+using System.IO.Pipelines;
+using System.Buffers;
+using System.Text;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Dapper;
 using Npgsql;
+using Azure.Messaging.ServiceBus;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 
 public class Demo
 {
@@ -50,6 +63,72 @@ public class Custom
     public void Execute(string query) { }
 }
 
+public sealed class HubService { public string Command => "fixed"; }
+public sealed class BodyInput { public string Command { get; set; } = ""; }
+public sealed class InputHub : Hub
+{
+    public void Execute(string command, HubService service)
+    {
+        Process.Start(command);
+        Process.Start(service.Command);
+    }
+    public async Task Upload(IAsyncEnumerable<string> stream)
+    {
+        await foreach (var command in stream) Process.Start(command);
+    }
+}
+public sealed class FunctionInput
+{
+    [Function("http")]
+    public async Task Http([HttpTrigger] HttpRequestData request,
+        [Microsoft.Azure.Functions.Worker.Http.FromBody] BodyInput body)
+    {
+        Process.Start(await request.ReadAsStringAsync());
+        Process.Start(body.Command);
+        Process.Start(request.FunctionContext.InvocationId);
+    }
+    [Function("bus")]
+    public void Bus([ServiceBusTrigger("queue")] ServiceBusReceivedMessage message,
+        ServiceBusMessageActions actions, HubService service)
+    {
+        Process.Start(message.Body.ToString());
+        Process.Start(actions.ToString());
+        Process.Start(service.Command);
+    }
+}
+public static class NetworkInput
+{
+    public static async Task Run(HttpContext context)
+    {
+        var socket = await context.WebSockets.AcceptWebSocketAsync();
+        var bytes = new byte[128];
+        await socket.ReceiveAsync(bytes.AsMemory(), default);
+        Process.Start(Encoding.UTF8.GetString(bytes));
+        var result = await context.Request.BodyReader.ReadAsync();
+        Process.Start(Encoding.UTF8.GetString(result.Buffer.ToArray()));
+        if (context.Request.BodyReader.TryRead(out var available))
+            Process.Start(Encoding.UTF8.GetString(available.Buffer.ToArray()));
+        var local = new Pipe();
+        var safe = await local.Reader.ReadAsync();
+        Process.Start(Encoding.UTF8.GetString(safe.Buffer.ToArray()));
+    }
+}
+public static class HubRegistration
+{
+    public static void Configure(IServiceCollection services)
+    {
+        services.AddSingleton<HubService>();
+        services.AddSignalR();
+    }
+    public static void Map(IEndpointRouteBuilder endpoints) => endpoints.MapHub<InputHub>("/input");
+    public static void MapBody(WebApplication app)
+    {
+        app.MapPost("/body", (BodyInput body) => Process.Start(body.Command));
+        app.MapPost("/upload", (IFormFile file) => Process.Start(file.FileName));
+        app.MapPost("/service", (HubService service) => Process.Start(service.Command));
+    }
+}
+
 namespace Newtonsoft.Json
 {
     public enum TypeNameHandling { None, All }
@@ -61,7 +140,7 @@ namespace Newtonsoft.Json
 '@ | Set-Content -LiteralPath (Join-Path $projectPath 'Unsafe Input.cs') -Encoding utf8
 $project = Join-Path $projectPath 'CliSmoke.csproj'
 $projectXml = Get-Content -LiteralPath $project -Raw
-$packageReference = "  <ItemGroup><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
+$packageReference = "  <ItemGroup><FrameworkReference Include=`"Microsoft.AspNetCore.App`" /><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Microsoft.Azure.Functions.Worker.Core`" Version=`"2.52.0`" /><PackageReference Include=`"Microsoft.Azure.Functions.Worker.Extensions.Http`" Version=`"3.3.0`" /><PackageReference Include=`"Microsoft.Azure.Functions.Worker.Extensions.ServiceBus`" Version=`"5.24.0`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
 $projectXml.Replace('</Project>', "$packageReference`n</Project>") |
     Set-Content -LiteralPath $project -Encoding utf8
 $nugetConfig = Join-Path $scratch 'NuGet.Config'
@@ -104,7 +183,7 @@ if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default 
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
-    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 1 -or
+    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 11 -or
     @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
     @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))
@@ -143,8 +222,14 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
-& $tool $project --fail | Out-Null
+$net8Sarif = Join-Path $scratch 'results-net8.sarif'
+& $tool $project --sarif $net8Sarif --fail | Out-Null
 if ($LASTEXITCODE -ne 1) { throw 'Global tool did not find the .NET 8 flows.' }
+$net8Report = Get-Content -LiteralPath $net8Sarif -Raw | ConvertFrom-Json
+$net8Ids = @($net8Report.runs[0].results | ForEach-Object ruleId)
+if (Compare-Object ($ids | Sort-Object) ($net8Ids | Sort-Object)) {
+    throw '.NET 8 and .NET 10 fixtures must report the same source-to-sink flows.'
+}
 
 $config = Join-Path $scratch 'custom.json'
 @'
