@@ -109,6 +109,7 @@ namespace Dotnetarium.Config
 
     internal sealed class Parameter
     {
+        public string Binding { get; set; }
         public string[] Types { get; set; }
         public string[] Names { get; set; }
         public AttributeCheckIncludeExclude Attributes { get; set; }

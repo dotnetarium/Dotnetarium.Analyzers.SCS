@@ -47,6 +47,7 @@ namespace Dotnetarium.Config
         private readonly ConfigData model;
         private readonly Compilation compilation;
         private readonly Lazy<ImmutableHashSet<IMethodSymbol>> minimalApiHandlers;
+        private readonly Lazy<SignalRInputModel> signalRInputs;
         private readonly WellKnownTypeProvider types;
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SourceInfo>> sourceMaps = new();
         private readonly ConcurrentDictionary<SinkKind, TaintedDataSymbolMap<SanitizerInfo>> sanitizerMaps = new();
@@ -57,6 +58,7 @@ namespace Dotnetarium.Config
             this.model = model;
             this.compilation = compilation;
             minimalApiHandlers = new Lazy<ImmutableHashSet<IMethodSymbol>>(FindMinimalApiHandlers);
+            signalRInputs = new Lazy<SignalRInputModel>(() => new SignalRInputModel(compilation));
             types = WellKnownTypeProvider.GetOrCreate(compilation);
         }
 
@@ -185,7 +187,7 @@ namespace Dotnetarium.Config
             if (entry.Dependency != null && entry.Dependency.Any(dependency =>
                 !provider.TryGetOrCreateTypeByMetadataName(dependency, out _)))
                 return false;
-            if (entry.Parameter?.Types == null && entry.Parameter?.Names == null &&
+            if (entry.Parameter?.Binding == null && entry.Parameter?.Types == null && entry.Parameter?.Names == null &&
                 IsMinimalApiInputParameter(parameter, compilation))
                 return true;
             if (parameter.ContainingSymbol is not IMethodSymbol method ||
@@ -271,7 +273,9 @@ namespace Dotnetarium.Config
                      candidate.OriginalDefinition, expected.OriginalDefinition)))))
                 return false;
 
-            return !HasAnyParameterAttribute(parameter, provider, entry.Parameter?.Attributes?.Exclude);
+            if (HasAnyParameterAttribute(parameter, provider, entry.Parameter?.Attributes?.Exclude))
+                return false;
+            return entry.Parameter?.Binding != "SignalR" || signalRInputs.Value.IsInput(parameter);
         }
 
         private bool IsMinimalApiInputParameter(IParameterSymbol parameter, Compilation compilation)

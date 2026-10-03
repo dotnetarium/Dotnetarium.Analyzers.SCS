@@ -21,6 +21,7 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
         private readonly Dictionary<ITypeSymbol, List<Registration>> _registrations =
             new Dictionary<ITypeSymbol, List<Registration>>(SymbolEqualityComparer.Default);
         private readonly Dictionary<string, List<int>> _opaqueCalls = new Dictionary<string, List<int>>();
+        private readonly HashSet<ITypeSymbol> _descriptorServices = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
         private DependencyInjectionRegistrationModel(Compilation compilation)
         {
@@ -32,11 +33,26 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                 }
 
                 var semanticModel = compilation.GetSemanticModel(tree);
+                foreach (var syntax in root.DescendantNodes().OfType<ObjectCreationExpressionSyntax>())
+                {
+                    if (semanticModel.GetOperation(syntax) is IObjectCreationOperation creation &&
+                        creation.Type?.ToDisplayString() == "Microsoft.Extensions.DependencyInjection.ServiceDescriptor" &&
+                        creation.Arguments.FirstOrDefault()?.Value is ITypeOfOperation service)
+                        _descriptorServices.Add(service.TypeOperand);
+                }
                 foreach (var syntax in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
                 {
                     if (semanticModel.GetOperation(syntax) is not IInvocationOperation invocation)
                     {
                         continue;
+                    }
+
+                    if (invocation.TargetMethod.ContainingType.ToDisplayString() ==
+                        "Microsoft.Extensions.DependencyInjection.ServiceDescriptor")
+                    {
+                        var descriptorService = invocation.TargetMethod.TypeArguments.FirstOrDefault() ??
+                            (invocation.Arguments.FirstOrDefault()?.Value as ITypeOfOperation)?.TypeOperand;
+                        if (descriptorService != null) _descriptorServices.Add(descriptorService);
                     }
 
                     var receiver = invocation.Instance ?? invocation.Arguments.FirstOrDefault()?.Value;
@@ -91,6 +107,21 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
 
         internal static DependencyInjectionRegistrationModel GetOrCreate(Compilation compilation) =>
             Cache.GetValue(compilation, key => new DependencyInjectionRegistrationModel(key));
+
+        // Source binding only needs to know whether DI can supply a parameter;
+        // factories and conditional registrations are deliberately included.
+        internal bool HasPossibleRegistration(ITypeSymbol serviceType)
+        {
+            if (serviceType is INamedTypeSymbol sequence &&
+                sequence.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.IEnumerable<T>")
+                serviceType = sequence.TypeArguments[0];
+
+            return _registrations.Keys.Concat(_descriptorServices).Any(registered =>
+                SymbolEqualityComparer.Default.Equals(registered, serviceType) ||
+                registered is INamedTypeSymbol generic && generic.IsUnboundGenericType &&
+                serviceType is INamedTypeSymbol constructed &&
+                SymbolEqualityComparer.Default.Equals(generic.OriginalDefinition, constructed.OriginalDefinition));
+        }
 
         internal bool TryGetImplementations(ITypeSymbol serviceType, bool multiple, out ImmutableArray<INamedTypeSymbol> implementations)
         {

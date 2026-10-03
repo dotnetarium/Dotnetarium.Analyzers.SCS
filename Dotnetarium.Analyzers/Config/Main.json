@@ -99,6 +99,17 @@
       },
       "Parameter": { "Names": [ "request", "requestStream" ] }
     },
+    "SignalRHub": {
+      "SourceType": "System.Object",
+      "Dependency": [ "Microsoft.AspNetCore.SignalR.Hub" ],
+      "Class": { "Parent": "Microsoft.AspNetCore.SignalR.Hub" },
+      "Method": {
+        "Accessibility": [ "public" ],
+        "IncludeConstructor": false,
+        "Static": false
+      },
+      "Parameter": { "Binding": "SignalR" }
+    },
     "Microsoft.AspNetCore.Mvc.RazorPages.PageModel": {
       "Class": {
         "Accessibility": [

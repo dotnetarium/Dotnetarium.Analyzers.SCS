@@ -23,6 +23,11 @@ using System;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Dapper;
 using Npgsql;
 
@@ -50,6 +55,29 @@ public class Custom
     public void Execute(string query) { }
 }
 
+public sealed class HubService { public string Command => "fixed"; }
+public sealed class InputHub : Hub
+{
+    public void Execute(string command, HubService service)
+    {
+        Process.Start(command);
+        Process.Start(service.Command);
+    }
+    public async Task Upload(IAsyncEnumerable<string> stream)
+    {
+        await foreach (var command in stream) Process.Start(command);
+    }
+}
+public static class HubRegistration
+{
+    public static void Configure(IServiceCollection services)
+    {
+        services.AddSingleton<HubService>();
+        services.AddSignalR();
+    }
+    public static void Map(IEndpointRouteBuilder endpoints) => endpoints.MapHub<InputHub>("/input");
+}
+
 namespace Newtonsoft.Json
 {
     public enum TypeNameHandling { None, All }
@@ -61,7 +89,7 @@ namespace Newtonsoft.Json
 '@ | Set-Content -LiteralPath (Join-Path $projectPath 'Unsafe Input.cs') -Encoding utf8
 $project = Join-Path $projectPath 'CliSmoke.csproj'
 $projectXml = Get-Content -LiteralPath $project -Raw
-$packageReference = "  <ItemGroup><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
+$packageReference = "  <ItemGroup><FrameworkReference Include=`"Microsoft.AspNetCore.App`" /><PackageReference Include=`"Dotnetarium.Analyzers`" Version=`"$analyzerVersion`" /><PackageReference Include=`"Dapper`" Version=`"2.1.79`" /><PackageReference Include=`"Npgsql`" Version=`"10.0.3`" /></ItemGroup>"
 $projectXml.Replace('</Project>', "$packageReference`n</Project>") |
     Set-Content -LiteralPath $project -Encoding utf8
 $nugetConfig = Join-Path $scratch 'NuGet.Config'
@@ -104,7 +132,7 @@ if (-not ($scanOutput -match 'CWE-')) { throw 'Console findings omitted default 
 $report = Get-Content -LiteralPath $sarif -Raw | ConvertFrom-Json
 $ids = @($report.runs[0].results | ForEach-Object ruleId)
 if (@($ids | Where-Object { $_ -eq 'DNA0001' }).Count -ne 2 -or
-    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 1 -or
+    @($ids | Where-Object { $_ -eq 'DNA0002' }).Count -ne 3 -or
     @($ids | Where-Object { $_ -eq 'DNA0008' }).Count -ne 1 -or
     @($ids | Where-Object { $_ -eq 'DNA0011' }).Count -ne 1) {
     throw ('Unexpected default CLI rules: ' + ($ids -join ', '))
