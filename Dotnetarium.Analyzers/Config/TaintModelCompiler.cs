@@ -319,10 +319,18 @@ namespace Dotnetarium.Config
                 return true;
 
             var typeName = parameter.Type.ToDisplayString();
+            if (typeName is "Microsoft.AspNetCore.Http.HttpContext" or
+                "Microsoft.AspNetCore.Http.HttpRequest" or "Microsoft.AspNetCore.Http.HttpResponse" or
+                "System.Security.Claims.ClaimsPrincipal" or "System.Threading.CancellationToken")
+                return false;
             if (typeName is "Microsoft.AspNetCore.Http.IFormFile" or
                 "Microsoft.AspNetCore.Http.IFormFileCollection" or "System.IO.Stream" or
                 "System.IO.Pipelines.PipeReader")
                 return true;
+            // A custom binder takes precedence over TryParse and may produce a
+            // server-owned value. Do not assume its result is request data.
+            if (parameter.Type is INamedTypeSymbol bound && HasCustomRequestBinder(bound))
+                return false;
             if (IsSimpleRequestType(parameter.Type) || HasRequestParser(parameter.Type) ||
                 parameter.Type is IArrayTypeSymbol array &&
                 (IsSimpleRequestType(array.ElementType) || HasRequestParser(array.ElementType)))
@@ -331,8 +339,7 @@ namespace Dotnetarium.Config
                 return false;
             if (parameter.Type is INamedTypeSymbol named &&
                 (named.IsAbstract && named.TypeKind != TypeKind.Interface ||
-                 named.TypeKind == TypeKind.Interface && !IsJsonCollectionType(named) ||
-                 HasCustomRequestBinder(named)))
+                 named.TypeKind == TypeKind.Interface && !IsJsonCollectionType(named)))
                 return false;
             return AllowsInferredBody(parameter);
         }
@@ -370,6 +377,7 @@ namespace Dotnetarium.Config
                 method.DeclaredAccessibility == Accessibility.Public && method.ReturnType.SpecialType == SpecialType.System_Boolean &&
                 method.Parameters.Length is 2 or 3 &&
                 method.Parameters[0].Type.SpecialType == SpecialType.System_String &&
+                (method.Parameters.Length == 2 || method.Parameters[1].Type.ToDisplayString() == "System.IFormatProvider") &&
                 method.Parameters.Last().RefKind == RefKind.Out &&
                 SymbolEqualityComparer.Default.Equals(method.Parameters.Last().Type, type));
 

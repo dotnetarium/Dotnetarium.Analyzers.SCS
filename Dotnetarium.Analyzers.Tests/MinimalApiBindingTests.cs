@@ -43,6 +43,15 @@ public sealed class MinimalApiBindingTests
         await AssertFindings(mapping, "", 1);
     }
 
+    [Theory]
+    [InlineData("app.MapPost(\"/cancel\", (System.Threading.CancellationToken token) => Process.Start(token.ToString()));")]
+    [InlineData("app.MapPost(\"/user\", (System.Security.Claims.ClaimsPrincipal user) => Process.Start(user.Identity.Name));")]
+    [InlineData("app.MapGet(\"/bound\", (BoundInput input) => Process.Start(input.Value));")]
+    public async Task Framework_context_and_custom_binding_are_not_request_payloads(string mapping)
+    {
+        await AssertFindings(mapping, "", 0);
+    }
+
     [Fact]
     public async Task A_custom_binder_is_not_assumed_to_return_request_data()
     {
@@ -69,6 +78,8 @@ public sealed class MinimalApiBindingTests
             public sealed class BoundInput
             {
                 public string Value => "fixed";
+                public static bool TryParse(string value, out BoundInput result)
+                { result = new BoundInput(); return true; }
                 public static System.Threading.Tasks.ValueTask<BoundInput> BindAsync(HttpContext context) => new(new BoundInput());
             }
             public static class Endpoints

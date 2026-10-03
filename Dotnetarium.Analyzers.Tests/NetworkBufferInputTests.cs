@@ -23,6 +23,7 @@ public sealed class NetworkBufferInputTests
     [InlineData("var bytes = new byte[128]; await new MemoryStream(new byte[128]).ReadExactlyAsync(bytes); Process.Start(Encoding.UTF8.GetString(bytes));", 0)]
     [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var first = new byte[128]; var second = new byte[128]; var view = first.AsMemory(); view = second.AsMemory(); await socket.ReceiveAsync(view, default); Process.Start(Encoding.UTF8.GetString(first));", 0)]
     [InlineData("var socket = await context.WebSockets.AcceptWebSocketAsync(); var bytes = new byte[128]; var memory = bytes.AsMemory(); bytes = new byte[128]; await socket.ReceiveAsync(memory, default); Process.Start(Encoding.UTF8.GetString(bytes));", 0)]
+    [InlineData("var bytes = new byte[128]; var memory = bytes.AsMemory(); context.Request.Body.ReadExactly(memory.Span); Process.Start(Encoding.UTF8.GetString(bytes));", 1)]
     public async Task Received_buffers_flow_but_local_buffers_do_not(string body, int expected)
     {
         var source = """

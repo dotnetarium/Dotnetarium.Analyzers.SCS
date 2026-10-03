@@ -222,8 +222,14 @@ if ($LASTEXITCODE -ne 0 -or -not ($buildOutput -match 'DNA0001') -or -not ($buil
     $buildOutput | Write-Output
     throw 'Packaged analyzer did not report the expected .NET 8 findings.'
 }
-& $tool $project --fail | Out-Null
+$net8Sarif = Join-Path $scratch 'results-net8.sarif'
+& $tool $project --sarif $net8Sarif --fail | Out-Null
 if ($LASTEXITCODE -ne 1) { throw 'Global tool did not find the .NET 8 flows.' }
+$net8Report = Get-Content -LiteralPath $net8Sarif -Raw | ConvertFrom-Json
+$net8Ids = @($net8Report.runs[0].results | ForEach-Object ruleId)
+if (Compare-Object ($ids | Sort-Object) ($net8Ids | Sort-Object)) {
+    throw '.NET 8 and .NET 10 fixtures must report the same source-to-sink flows.'
+}
 
 $config = Join-Path $scratch 'custom.json'
 @'

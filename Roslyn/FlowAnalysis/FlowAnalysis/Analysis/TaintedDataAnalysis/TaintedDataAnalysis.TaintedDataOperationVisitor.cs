@@ -1133,6 +1133,10 @@ namespace Analyzer.Utilities.FlowAnalysis.Analysis.TaintedDataAnalysis
                     if (method.Name == "Slice" && invocation.Instance != null)
                         return GetBufferViewStorage(invocation.Instance, seen);
                 }
+                if (operation is IPropertyReferenceOperation property && property.Instance != null &&
+                    property.Property.Name == "Span" &&
+                    property.Property.ContainingType.OriginalDefinition.ToDisplayString() == "System.Memory<T>")
+                    return GetBufferViewStorage(property.Instance, seen);
                 if (operation is ILocalReferenceOperation local && seen.Add(local.Local))
                 {
                     // Only a single assignment is safe to resolve without a separate alias
